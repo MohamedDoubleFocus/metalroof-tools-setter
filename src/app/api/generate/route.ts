@@ -9,7 +9,7 @@ import { createTask, pollTaskResult } from "@/lib/kie-ai";
 import type { RoofStyle } from "@/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 900;
+export const maxDuration = 300;
 
 interface RoofTaskDef {
   index: number;

@@ -19,6 +19,7 @@ interface PdfParams {
   originalImageBuffer: Buffer;
   colorPages: ColorPage[];
   logoBuffer: Buffer;
+  clientName?: string;
 }
 
 function drawBlackHeader(
@@ -60,7 +61,7 @@ function drawFooter(doc: PDFKit.PDFDocument) {
 }
 
 export async function buildPdf(params: PdfParams): Promise<Buffer> {
-  const { originalImageBuffer, colorPages, logoBuffer } = params;
+  const { originalImageBuffer, colorPages, logoBuffer, clientName } = params;
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -95,15 +96,19 @@ export async function buildPdf(params: PdfParams): Promise<Buffer> {
         width: CONTENT_W,
       });
 
-    // Subtitle
+    // Subtitle / Client name
     doc
-      .fontSize(12)
+      .fontSize(14)
       .fillColor(ACCENT)
-      .font("Helvetica")
-      .text("Préparée exclusivement pour vous", MARGIN, titleY + 72, {
-        align: "center",
-        width: CONTENT_W,
-      });
+      .font("Helvetica-Bold")
+      .text(
+        clientName
+          ? `Préparée pour ${clientName}`
+          : "Préparée exclusivement pour vous",
+        MARGIN,
+        titleY + 72,
+        { align: "center", width: CONTENT_W }
+      );
 
     // Date
     const now = new Date();

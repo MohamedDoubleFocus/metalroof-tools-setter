@@ -49,6 +49,7 @@ export interface AppState {
   uploadedImagePreview: string | null;
   enhancedImageUrl: string | null;
   address: string | null;
+  clientName: string;
   selectedColors: string[];
   selectedStyles: RoofStyle[];
   tasks: GenerationTask[];
@@ -63,6 +64,7 @@ export type AppAction =
   | { type: "SET_UPLOADED_URL"; url: string; preview?: string }
   | { type: "SET_UPLOAD_LOADING"; loading: boolean }
   | { type: "SET_ADDRESS"; address: string }
+  | { type: "SET_CLIENT_NAME"; name: string }
   | { type: "TOGGLE_COLOR"; colorKey: string }
   | { type: "TOGGLE_STYLE"; style: RoofStyle }
   | { type: "START_GENERATION"; tasks: GenerationTask[] }

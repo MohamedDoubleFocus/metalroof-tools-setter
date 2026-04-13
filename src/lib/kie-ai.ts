@@ -88,7 +88,7 @@ function sleep(ms: number): Promise<void> {
 
 export async function pollTaskResult(
   taskId: string,
-  timeoutMs = 180000
+  timeoutMs = 600000
 ): Promise<string[]> {
   const start = Date.now();
 

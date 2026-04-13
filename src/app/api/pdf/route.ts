@@ -4,7 +4,7 @@ import { downloadImageAsBuffer, getLogoPngBuffer } from "@/lib/image-utils";
 import { buildPdf } from "@/lib/pdf-builder";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 interface ColorResult {
   colorKey: string;
@@ -14,9 +14,10 @@ interface ColorResult {
 
 export async function POST(request: NextRequest) {
   try {
-    const { originalImageUrl, results } = (await request.json()) as {
+    const { originalImageUrl, results, clientName } = (await request.json()) as {
       originalImageUrl: string;
       results: ColorResult[];
+      clientName?: string;
     };
 
     if (!originalImageUrl || !results || results.length === 0) {
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
       originalImageBuffer,
       colorPages,
       logoBuffer,
+      clientName,
     });
 
     return new Response(new Uint8Array(pdfBuffer), {

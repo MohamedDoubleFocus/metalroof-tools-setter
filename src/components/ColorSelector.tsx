@@ -11,11 +11,10 @@ export default function ColorSelector({ selectedColors, onToggle }: Props) {
   return (
     <div>
       <h2 className="text-lg font-bold text-gray-800 mb-2">
-        Choisissez 3 couleurs
+        Choisissez vos couleurs
       </h2>
       <p className="text-sm text-gray-500 mb-6">
-        Sélectionnez exactement 3 couleurs pour générer vos simulations de
-        toiture.
+        Sélectionnez les couleurs pour générer vos simulations de toiture.
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -23,7 +22,7 @@ export default function ColorSelector({ selectedColors, onToggle }: Props) {
           const color = COLORS[key];
           const isSelected = selectedColors.includes(key);
           const selectionIndex = selectedColors.indexOf(key);
-          const isFull = selectedColors.length >= 3 && !isSelected;
+          const isFull = false;
 
           return (
             <button
@@ -66,7 +65,7 @@ export default function ColorSelector({ selectedColors, onToggle }: Props) {
       </div>
 
       <div className="mt-4 text-center text-sm text-gray-500">
-        {selectedColors.length}/3 couleurs sélectionnées
+        {selectedColors.length} couleur{selectedColors.length !== 1 ? "s" : ""} sélectionnée{selectedColors.length !== 1 ? "s" : ""}
       </div>
     </div>
   );

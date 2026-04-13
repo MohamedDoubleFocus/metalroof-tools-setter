@@ -27,6 +27,7 @@ const initialState: AppState = {
   uploadedImagePreview: null,
   enhancedImageUrl: null,
   address: null,
+  clientName: "",
   selectedColors: [],
   selectedStyles: [],
   tasks: [],
@@ -58,15 +59,15 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, uploadLoading: action.loading };
     case "SET_ADDRESS":
       return { ...state, address: action.address };
+    case "SET_CLIENT_NAME":
+      return { ...state, clientName: action.name };
     case "TOGGLE_COLOR": {
       const idx = state.selectedColors.indexOf(action.colorKey);
       let newColors: string[];
       if (idx >= 0) {
         newColors = state.selectedColors.filter((c) => c !== action.colorKey);
-      } else if (state.selectedColors.length < 3) {
-        newColors = [...state.selectedColors, action.colorKey];
       } else {
-        newColors = state.selectedColors;
+        newColors = [...state.selectedColors, action.colorKey];
       }
       return { ...state, selectedColors: newColors };
     }
@@ -129,7 +130,7 @@ export default function RoofSimulator() {
   );
 
   const canGenerate =
-    state.selectedColors.length === 3 && state.selectedStyles.length >= 1;
+    state.selectedColors.length >= 1 && state.selectedStyles.length >= 1;
 
   const handleGenerate = useCallback(async () => {
     if (!state.uploadedImageUrl || !canGenerate) return;
@@ -272,6 +273,7 @@ export default function RoofSimulator() {
         body: JSON.stringify({
           originalImageUrl: originalUrl,
           results,
+          clientName: state.clientName || undefined,
         }),
       });
 
@@ -286,7 +288,10 @@ export default function RoofSimulator() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "simulation-toiture.pdf";
+      const fileName = state.clientName
+        ? `simulation-toiture-${state.clientName.replace(/\s+/g, "-").toLowerCase()}.pdf`
+        : "simulation-toiture.pdf";
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -386,6 +391,21 @@ export default function RoofSimulator() {
                 </p>
               </div>
             )}
+
+            <div className="mb-8">
+              <h2 className="text-lg font-bold text-gray-800 mb-2">
+                Nom du client
+              </h2>
+              <input
+                type="text"
+                value={state.clientName}
+                onChange={(e) =>
+                  dispatch({ type: "SET_CLIENT_NAME", name: e.target.value })
+                }
+                placeholder="Ex: Jean Tremblay"
+                className="w-full max-w-md px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+              />
+            </div>
 
             <ColorSelector
               selectedColors={state.selectedColors}

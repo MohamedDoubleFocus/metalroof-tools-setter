@@ -132,6 +132,77 @@ export default function RoofSimulator() {
   const canGenerate =
     state.selectedColors.length >= 1 && state.selectedStyles.length >= 1;
 
+  const runSingleTask = useCallback(
+    async (
+      imageUrl: string,
+      taskType: "enhancement" | "roof",
+      taskIndex: number,
+      colorKey?: string,
+      roofStyle?: string
+    ): Promise<string | null> => {
+      dispatch({
+        type: "UPDATE_TASK",
+        taskIndex,
+        update: { status: "creating" },
+      });
+
+      const res = await fetch("/api/generate-task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl, taskType, colorKey, roofStyle }),
+      });
+
+      const data = await res.json();
+
+      if (data.status === "success") {
+        dispatch({
+          type: "UPDATE_TASK",
+          taskIndex,
+          update: { status: "success", resultUrl: data.resultUrl, taskId: data.taskId },
+        });
+        return data.resultUrl;
+      }
+
+      if (data.status === "timeout") {
+        // Task still running on Kie.AI — keep polling via retry endpoint
+        dispatch({
+          type: "UPDATE_TASK",
+          taskIndex,
+          update: { status: "polling" },
+        });
+
+        // Retry polling up to 5 times (5 x 280s = 23 min max)
+        for (let retry = 0; retry < 5; retry++) {
+          const pollRes = await fetch("/api/poll-task", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ taskId: data.taskId }),
+          });
+          const pollData = await pollRes.json();
+
+          if (pollData.status === "success") {
+            dispatch({
+              type: "UPDATE_TASK",
+              taskIndex,
+              update: { status: "success", resultUrl: pollData.resultUrl },
+            });
+            return pollData.resultUrl;
+          }
+
+          if (pollData.status === "error") {
+            throw new Error(pollData.error);
+          }
+          // timeout again — loop and retry
+        }
+
+        throw new Error("La generation a pris trop de temps");
+      }
+
+      throw new Error(data.error || "Erreur inconnue");
+    },
+    []
+  );
+
   const handleGenerate = useCallback(async () => {
     if (!state.uploadedImageUrl || !canGenerate) return;
 
@@ -158,69 +229,55 @@ export default function RoofSimulator() {
     dispatch({ type: "START_GENERATION", tasks });
 
     try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: state.uploadedImageUrl,
-          colors: state.selectedColors,
-          styles: state.selectedStyles,
-        }),
-      });
-
-      if (!res.ok || !res.body) {
-        throw new Error("Erreur de connexion au serveur");
+      // Step 1: Enhancement
+      let enhancedImageUrl = state.uploadedImageUrl;
+      try {
+        const result = await runSingleTask(
+          state.uploadedImageUrl,
+          "enhancement",
+          0
+        );
+        if (result) {
+          enhancedImageUrl = result;
+          dispatch({ type: "SET_ENHANCED_URL", url: result });
+        }
+      } catch {
+        // Enhancement failed, continue with original
+        dispatch({
+          type: "UPDATE_TASK",
+          taskIndex: 0,
+          update: { status: "error", error: "Enhancement echoue, on continue" },
+        });
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+      // Step 2: Roof tasks — 3 at a time
+      const roofTasks = tasks
+        .map((t, i) => ({ ...t, index: i }))
+        .filter((t) => t.taskType === "roof");
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const data = JSON.parse(line.slice(6));
-
-            if (data.type === "complete") {
-              dispatch({ type: "GENERATION_COMPLETE" });
-              return;
-            }
-
-            if (data.taskIndex !== undefined) {
+      const CONCURRENCY = 3;
+      for (let i = 0; i < roofTasks.length; i += CONCURRENCY) {
+        const batch = roofTasks.slice(i, i + CONCURRENCY);
+        await Promise.all(
+          batch.map((task) =>
+            runSingleTask(
+              enhancedImageUrl,
+              "roof",
+              task.index,
+              task.colorKey,
+              task.roofStyle
+            ).catch((err) => {
               dispatch({
                 type: "UPDATE_TASK",
-                taskIndex: data.taskIndex,
+                taskIndex: task.index,
                 update: {
-                  status: data.status,
-                  resultUrl: data.resultUrl,
-                  taskId: data.taskId,
-                  error: data.error,
+                  status: "error",
+                  error: err instanceof Error ? err.message : "Erreur",
                 },
               });
-
-              if (
-                data.taskIndex === 0 &&
-                data.status === "success" &&
-                data.resultUrl
-              ) {
-                dispatch({
-                  type: "SET_ENHANCED_URL",
-                  url: data.resultUrl,
-                });
-              }
-            }
-          } catch {
-            // skip unparseable lines
-          }
-        }
+            })
+          )
+        );
       }
 
       dispatch({ type: "GENERATION_COMPLETE" });
@@ -231,7 +288,7 @@ export default function RoofSimulator() {
           err instanceof Error ? err.message : "Erreur lors de la generation",
       });
     }
-  }, [state.uploadedImageUrl, state.selectedColors, state.selectedStyles, canGenerate]);
+  }, [state.uploadedImageUrl, state.selectedColors, state.selectedStyles, canGenerate, runSingleTask]);
 
   const handleDownloadPdf = useCallback(async () => {
     dispatch({ type: "SET_PDF_LOADING", loading: true });

@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     (s: string) => validStyles.includes(s as RoofStyle)
   );
 
-  if (!imageUrl || !colors || colors.length !== 3 || selectedStyles.length === 0) {
+  if (!imageUrl || !colors || colors.length === 0 || selectedStyles.length === 0) {
     return new Response(
       JSON.stringify({ error: "Paramètres invalides" }),
       { status: 400, headers: { "Content-Type": "application/json" } }

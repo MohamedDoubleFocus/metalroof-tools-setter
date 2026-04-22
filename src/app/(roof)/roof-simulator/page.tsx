@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useCallback } from "react";
+import { useReducer, useCallback, useRef } from "react";
 import type {
   AppState,
   AppAction,
@@ -108,6 +108,7 @@ function reducer(state: AppState, action: AppAction): AppState {
 
 export default function RoofSimulator() {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const enhancedUrlRef = useRef<string | null>(null);
 
   const handleInputMode = useCallback((mode: InputMode) => {
     dispatch({ type: "SET_INPUT_MODE", mode });
@@ -132,6 +133,69 @@ export default function RoofSimulator() {
   const canGenerate =
     state.selectedColors.length >= 1 && state.selectedStyles.length >= 1;
 
+  // Phase 1: Create task on Kie.AI, get taskId back immediately
+  const createKieTask = useCallback(
+    async (
+      imageUrl: string,
+      taskType: "enhancement" | "roof",
+      colorKey?: string,
+      roofStyle?: string
+    ): Promise<string> => {
+      const res = await fetch("/api/generate-task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl, taskType, colorKey, roofStyle }),
+      });
+      const data = await res.json();
+      if (data.status === "created" && data.taskId) {
+        return data.taskId;
+      }
+      throw new Error(data.error || "Erreur lors de la creation de la tache");
+    },
+    []
+  );
+
+  // Phase 2: Poll until done — auto-retries on Vercel timeout
+  const pollUntilDone = useCallback(
+    async (taskId: string, taskIndex: number): Promise<string | null> => {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        try {
+          const res = await fetch("/api/poll-task", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ taskId }),
+          });
+          const data = await res.json();
+
+          if (data.status === "success") {
+            return data.resultUrl;
+          }
+
+          if (data.status === "error") {
+            throw new Error(data.error || "Kie.AI a retourne une erreur");
+          }
+
+          // timeout — Vercel cut the connection but Kie.AI is still working
+          // Update UI to show we're still polling
+          dispatch({
+            type: "UPDATE_TASK",
+            taskIndex,
+            update: { status: "polling" },
+          });
+          // Loop and retry immediately
+        } catch (err) {
+          // Network error or Vercel 504 — retry
+          if (attempt >= 9) throw err;
+          // Brief pause before retry on network errors
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      }
+      throw new Error("La generation a pris trop de temps (10 tentatives)");
+    },
+    []
+  );
+
+  // Combined: create + poll for a single task
   const runSingleTask = useCallback(
     async (
       imageUrl: string,
@@ -140,67 +204,33 @@ export default function RoofSimulator() {
       colorKey?: string,
       roofStyle?: string
     ): Promise<string | null> => {
+      // Phase 1: Create
       dispatch({
         type: "UPDATE_TASK",
         taskIndex,
         update: { status: "creating" },
       });
 
-      const res = await fetch("/api/generate-task", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl, taskType, colorKey, roofStyle }),
+      const taskId = await createKieTask(imageUrl, taskType, colorKey, roofStyle);
+
+      dispatch({
+        type: "UPDATE_TASK",
+        taskIndex,
+        update: { status: "polling", taskId },
       });
 
-      const data = await res.json();
+      // Phase 2: Poll
+      const resultUrl = await pollUntilDone(taskId, taskIndex);
 
-      if (data.status === "success") {
-        dispatch({
-          type: "UPDATE_TASK",
-          taskIndex,
-          update: { status: "success", resultUrl: data.resultUrl, taskId: data.taskId },
-        });
-        return data.resultUrl;
-      }
+      dispatch({
+        type: "UPDATE_TASK",
+        taskIndex,
+        update: { status: "success", resultUrl: resultUrl || undefined },
+      });
 
-      if (data.status === "timeout") {
-        // Task still running on Kie.AI — keep polling via retry endpoint
-        dispatch({
-          type: "UPDATE_TASK",
-          taskIndex,
-          update: { status: "polling" },
-        });
-
-        // Retry polling up to 5 times (5 x 280s = 23 min max)
-        for (let retry = 0; retry < 5; retry++) {
-          const pollRes = await fetch("/api/poll-task", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskId: data.taskId }),
-          });
-          const pollData = await pollRes.json();
-
-          if (pollData.status === "success") {
-            dispatch({
-              type: "UPDATE_TASK",
-              taskIndex,
-              update: { status: "success", resultUrl: pollData.resultUrl },
-            });
-            return pollData.resultUrl;
-          }
-
-          if (pollData.status === "error") {
-            throw new Error(pollData.error);
-          }
-          // timeout again — loop and retry
-        }
-
-        throw new Error("La generation a pris trop de temps");
-      }
-
-      throw new Error(data.error || "Erreur inconnue");
+      return resultUrl;
     },
-    []
+    [createKieTask, pollUntilDone]
   );
 
   const handleGenerate = useCallback(async () => {
@@ -227,6 +257,7 @@ export default function RoofSimulator() {
     }
 
     dispatch({ type: "START_GENERATION", tasks });
+    enhancedUrlRef.current = null;
 
     try {
       // Step 1: Enhancement
@@ -239,10 +270,10 @@ export default function RoofSimulator() {
         );
         if (result) {
           enhancedImageUrl = result;
+          enhancedUrlRef.current = result;
           dispatch({ type: "SET_ENHANCED_URL", url: result });
         }
       } catch {
-        // Enhancement failed, continue with original
         dispatch({
           type: "UPDATE_TASK",
           taskIndex: 0,
@@ -290,6 +321,69 @@ export default function RoofSimulator() {
     }
   }, [state.uploadedImageUrl, state.selectedColors, state.selectedStyles, canGenerate, runSingleTask]);
 
+  // Retry only failed tasks
+  const handleRetryFailed = useCallback(async () => {
+    const imageUrl = enhancedUrlRef.current || state.enhancedImageUrl || state.uploadedImageUrl;
+    if (!imageUrl) return;
+
+    // Switch back to generating view
+    dispatch({ type: "SET_ERROR", error: null });
+
+    const failedTasks = state.tasks
+      .map((t, i) => ({ ...t, index: i }))
+      .filter((t) => t.status === "error" && t.taskType === "roof");
+
+    if (failedTasks.length === 0) return;
+
+    // Reset failed tasks to pending
+    for (const task of failedTasks) {
+      dispatch({
+        type: "UPDATE_TASK",
+        taskIndex: task.index,
+        update: { status: "pending", error: undefined, resultUrl: undefined },
+      });
+    }
+
+    // Go back to generating step
+    // We need a way to show progress — set step back
+    const hasResults = state.tasks.some((t) => t.status === "success" && t.taskType === "roof");
+    if (hasResults) {
+      // Stay on results but show generating state via step
+    }
+
+    const CONCURRENCY = 3;
+    for (let i = 0; i < failedTasks.length; i += CONCURRENCY) {
+      const batch = failedTasks.slice(i, i + CONCURRENCY);
+      await Promise.all(
+        batch.map((task) =>
+          runSingleTask(
+            imageUrl,
+            "roof",
+            task.index,
+            task.colorKey,
+            task.roofStyle
+          ).catch((err) => {
+            dispatch({
+              type: "UPDATE_TASK",
+              taskIndex: task.index,
+              update: {
+                status: "error",
+                error: err instanceof Error ? err.message : "Erreur",
+              },
+            });
+          })
+        )
+      );
+    }
+  }, [state.tasks, state.enhancedImageUrl, state.uploadedImageUrl, runSingleTask]);
+
+  const failedCount = state.tasks.filter(
+    (t) => t.status === "error" && t.taskType === "roof"
+  ).length;
+  const successCount = state.tasks.filter(
+    (t) => t.status === "success" && t.taskType === "roof"
+  ).length;
+
   const handleDownloadPdf = useCallback(async () => {
     dispatch({ type: "SET_PDF_LOADING", loading: true });
 
@@ -320,6 +414,10 @@ export default function RoofSimulator() {
           waveTileUrl: v.waveTileUrl,
           standingSeamUrl: v.standingSeamUrl,
         }));
+
+      if (results.length === 0) {
+        throw new Error("Aucune image reussie a inclure dans le PDF");
+      }
 
       const originalUrl =
         state.enhancedImageUrl || state.uploadedImageUrl;
@@ -364,7 +462,7 @@ export default function RoofSimulator() {
     } finally {
       dispatch({ type: "SET_PDF_LOADING", loading: false });
     }
-  }, [state.tasks, state.uploadedImageUrl, state.enhancedImageUrl]);
+  }, [state.tasks, state.uploadedImageUrl, state.enhancedImageUrl, state.clientName]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -489,11 +587,34 @@ export default function RoofSimulator() {
 
         {state.step === "results" && (
           <div>
+            {failedCount > 0 && (
+              <div className="max-w-3xl mx-auto mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                <p className="text-yellow-800 font-semibold">
+                  {failedCount} generation{failedCount > 1 ? "s" : ""} echouee{failedCount > 1 ? "s" : ""}
+                </p>
+                <p className="text-sm text-yellow-700 mt-1">
+                  {successCount > 0
+                    ? "Vous pouvez telecharger le PDF avec les images disponibles, ou relancer les echouees."
+                    : "Aucune image n'a reussi. Relancez les generations."}
+                </p>
+                <button
+                  onClick={handleRetryFailed}
+                  className="mt-3 px-5 py-2 bg-accent text-white rounded-lg font-semibold text-sm hover:bg-accent-light transition-colors"
+                >
+                  Relancer les {failedCount} generation{failedCount > 1 ? "s" : ""} echouee{failedCount > 1 ? "s" : ""}
+                </button>
+              </div>
+            )}
+
             <ResultsGallery tasks={state.tasks} />
-            <DownloadButton
-              loading={state.pdfLoading}
-              onClick={handleDownloadPdf}
-            />
+
+            {successCount > 0 && (
+              <DownloadButton
+                loading={state.pdfLoading}
+                onClick={handleDownloadPdf}
+              />
+            )}
+
             <div className="text-center mt-6">
               <button
                 onClick={() => dispatch({ type: "RESET" })}

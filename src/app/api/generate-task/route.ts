@@ -5,11 +5,11 @@ import {
   getWaveTilePrompt,
   getStandingSeamPrompt,
 } from "@/lib/prompts";
-import { createTask, pollTaskResult } from "@/lib/kie-ai";
+import { createTask } from "@/lib/kie-ai";
 import type { RoofStyle } from "@/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   const { imageUrl, taskType, colorKey, roofStyle } = (await request.json()) as {
@@ -39,32 +39,17 @@ export async function POST(request: NextRequest) {
           : getStandingSeamPrompt(color);
     }
 
-    // Create task
+    // Only create the task, return taskId immediately
     const taskId = await createTask(prompt, imageUrl);
 
-    // Poll with 280s timeout (leave margin for Vercel's 300s limit)
-    const resultUrls = await pollTaskResult(taskId, 280000);
-    const resultUrl = resultUrls[0] || null;
-
     return NextResponse.json({
-      status: "success",
+      status: "created",
       taskId,
-      resultUrl,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
-
-    // If it's a timeout, return the taskId so client can retry polling
-    if (message.includes("timed out")) {
-      return NextResponse.json({
-        status: "timeout",
-        error: message,
-      });
-    }
-
     return NextResponse.json({
       status: "error",
-      error: message,
+      error: err instanceof Error ? err.message : "Erreur inconnue",
     });
   }
 }

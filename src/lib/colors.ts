@@ -45,6 +45,12 @@ export const COLORS: Record<string, ColorDefinition> = {
     ral: "RAL 8004",
     hex: "#8E4B2E",
   },
+  "Blue Gray": {
+    name: "Blue Gray",
+    frenchName: "Bleu Gris",
+    ral: "RAL 7016",
+    hex: "#293133",
+  },
 };
 
 export const COLOR_KEYS = Object.keys(COLORS);

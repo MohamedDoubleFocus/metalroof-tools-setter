@@ -50,6 +50,7 @@ export interface AppState {
   enhancedImageUrl: string | null;
   address: string | null;
   clientName: string;
+  customInstructions: string;
   selectedColors: string[];
   selectedStyles: RoofStyle[];
   tasks: GenerationTask[];
@@ -65,6 +66,7 @@ export type AppAction =
   | { type: "SET_UPLOAD_LOADING"; loading: boolean }
   | { type: "SET_ADDRESS"; address: string }
   | { type: "SET_CLIENT_NAME"; name: string }
+  | { type: "SET_CUSTOM_INSTRUCTIONS"; instructions: string }
   | { type: "TOGGLE_COLOR"; colorKey: string }
   | { type: "TOGGLE_STYLE"; style: RoofStyle }
   | { type: "START_GENERATION"; tasks: GenerationTask[] }

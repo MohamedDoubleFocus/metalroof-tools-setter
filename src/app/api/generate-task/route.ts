@@ -12,11 +12,12 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
-  const { imageUrl, taskType, colorKey, roofStyle } = (await request.json()) as {
+  const { imageUrl, taskType, colorKey, roofStyle, customInstructions } = (await request.json()) as {
     imageUrl: string;
     taskType: "enhancement" | "roof";
     colorKey?: string;
     roofStyle?: RoofStyle;
+    customInstructions?: string;
   };
 
   if (!imageUrl) {
@@ -35,8 +36,8 @@ export async function POST(request: NextRequest) {
       const color = COLORS[colorKey];
       prompt =
         roofStyle === "wave_tile"
-          ? getWaveTilePrompt(color)
-          : getStandingSeamPrompt(color);
+          ? getWaveTilePrompt(color, customInstructions)
+          : getStandingSeamPrompt(color, customInstructions);
     }
 
     // Only create the task, return taskId immediately

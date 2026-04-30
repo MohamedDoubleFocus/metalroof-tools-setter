@@ -23,8 +23,21 @@ function getColorLine(color: ColorDefinition): string {
   return `The color must be ${color.name}, ${color.ral} (hex ${color.hex}). Do not approximate, shift the hue, change saturation, brighten, or darken. Strict RAL conformity required.`;
 }
 
-export function getWaveTilePrompt(color: ColorDefinition): string {
+function getCustomInstructionsBlock(customInstructions?: string): string {
+  const trimmed = customInstructions?.trim();
+  if (!trimmed) return "";
+  return `
+
+ADDITIONAL CUSTOM INSTRUCTIONS — These are explicit user-provided directives that take PRIORITY over the general preservation rules above, but ONLY for the specific elements they mention. Apply them strictly and photorealistically:
+
+${trimmed}
+
+For any element NOT mentioned in these custom instructions, fall back to the preservation rules above (keep original color, material, and texture).`;
+}
+
+export function getWaveTilePrompt(color: ColorDefinition, customInstructions?: string): string {
   const colorLine = getColorLine(color);
+  const customBlock = getCustomInstructionsBlock(customInstructions);
 
   return `Replace ONLY the main roof covering material on this house. The output roof area must equal the input roof area exactly — no more, no less.
 
@@ -47,13 +60,14 @@ Do NOT propagate, reflect, echo, or coordinate the new roof color onto gutters o
 
 Do not add roofing material to any surface that is not already a roof. Do not extend the roof beyond its original edges.
 
-Keep the full house structure unchanged. Keep the roof geometry, shape, pitch, angles, ridges, hips, valleys, and overhangs identical. Keep the environment, vegetation, sky, lighting, shadows, and season exactly as they are in the original photo.
+Keep the full house structure unchanged. Keep the roof geometry, shape, pitch, angles, ridges, hips, valleys, and overhangs identical. Keep the environment, vegetation, sky, lighting, shadows, and season exactly as they are in the original photo.${customBlock}
 
-The result must be photorealistic. The original roof boundaries must remain locked. The image passes validation only if the roof area is identical to the original, gutters and soffits have the exact same color as the input, and absolutely nothing else has changed.`;
+The result must be photorealistic. The original roof boundaries must remain locked. The image passes validation only if the roof area is identical to the original, gutters and soffits have the exact same color as the input (unless explicitly overridden by the custom instructions above), and absolutely nothing else has changed.`;
 }
 
-export function getStandingSeamPrompt(color: ColorDefinition): string {
+export function getStandingSeamPrompt(color: ColorDefinition, customInstructions?: string): string {
   const colorLine = getColorLine(color);
+  const customBlock = getCustomInstructionsBlock(customInstructions);
 
   return `Replace ONLY the main roof covering material on this house. The output roof area must equal the input roof area exactly — no more, no less.
 
@@ -76,7 +90,7 @@ Do NOT propagate, reflect, echo, or coordinate the new roof color onto gutters o
 
 Do not add roofing material to any surface that is not already a roof. Do not extend the roof beyond its original edges.
 
-Keep the full house structure unchanged. Keep the roof geometry, shape, pitch, angles, ridges, hips, valleys, and overhangs identical. Keep the environment, vegetation, sky, lighting, shadows, and season exactly as they are in the original photo.
+Keep the full house structure unchanged. Keep the roof geometry, shape, pitch, angles, ridges, hips, valleys, and overhangs identical. Keep the environment, vegetation, sky, lighting, shadows, and season exactly as they are in the original photo.${customBlock}
 
-The result must be photorealistic. The original roof boundaries must remain locked. The image passes validation only if the roof area is identical to the original, gutters and soffits have the exact same color as the input, and absolutely nothing else has changed.`;
+The result must be photorealistic. The original roof boundaries must remain locked. The image passes validation only if the roof area is identical to the original, gutters and soffits have the exact same color as the input (unless explicitly overridden by the custom instructions above), and absolutely nothing else has changed.`;
 }

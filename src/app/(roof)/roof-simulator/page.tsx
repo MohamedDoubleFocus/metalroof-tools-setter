@@ -28,6 +28,7 @@ const initialState: AppState = {
   enhancedImageUrl: null,
   address: null,
   clientName: "",
+  customInstructions: "",
   selectedColors: [],
   selectedStyles: [],
   tasks: [],
@@ -61,6 +62,8 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, address: action.address };
     case "SET_CLIENT_NAME":
       return { ...state, clientName: action.name };
+    case "SET_CUSTOM_INSTRUCTIONS":
+      return { ...state, customInstructions: action.instructions };
     case "TOGGLE_COLOR": {
       const idx = state.selectedColors.indexOf(action.colorKey);
       let newColors: string[];
@@ -139,12 +142,13 @@ export default function RoofSimulator() {
       imageUrl: string,
       taskType: "enhancement" | "roof",
       colorKey?: string,
-      roofStyle?: string
+      roofStyle?: string,
+      customInstructions?: string
     ): Promise<string> => {
       const res = await fetch("/api/generate-task", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl, taskType, colorKey, roofStyle }),
+        body: JSON.stringify({ imageUrl, taskType, colorKey, roofStyle, customInstructions }),
       });
       const data = await res.json();
       if (data.status === "created" && data.taskId) {
@@ -202,7 +206,8 @@ export default function RoofSimulator() {
       taskType: "enhancement" | "roof",
       taskIndex: number,
       colorKey?: string,
-      roofStyle?: string
+      roofStyle?: string,
+      customInstructions?: string
     ): Promise<string | null> => {
       // Phase 1: Create
       dispatch({
@@ -211,7 +216,7 @@ export default function RoofSimulator() {
         update: { status: "creating" },
       });
 
-      const taskId = await createKieTask(imageUrl, taskType, colorKey, roofStyle);
+      const taskId = await createKieTask(imageUrl, taskType, colorKey, roofStyle, customInstructions);
 
       dispatch({
         type: "UPDATE_TASK",
@@ -296,7 +301,8 @@ export default function RoofSimulator() {
               "roof",
               task.index,
               task.colorKey,
-              task.roofStyle
+              task.roofStyle,
+              state.customInstructions
             ).catch((err) => {
               dispatch({
                 type: "UPDATE_TASK",
@@ -319,7 +325,7 @@ export default function RoofSimulator() {
           err instanceof Error ? err.message : "Erreur lors de la generation",
       });
     }
-  }, [state.uploadedImageUrl, state.selectedColors, state.selectedStyles, canGenerate, runSingleTask]);
+  }, [state.uploadedImageUrl, state.selectedColors, state.selectedStyles, state.customInstructions, canGenerate, runSingleTask]);
 
   // Retry only failed tasks
   const handleRetryFailed = useCallback(async () => {
@@ -361,7 +367,8 @@ export default function RoofSimulator() {
             "roof",
             task.index,
             task.colorKey,
-            task.roofStyle
+            task.roofStyle,
+            state.customInstructions
           ).catch((err) => {
             dispatch({
               type: "UPDATE_TASK",
@@ -375,7 +382,7 @@ export default function RoofSimulator() {
         )
       );
     }
-  }, [state.tasks, state.enhancedImageUrl, state.uploadedImageUrl, runSingleTask]);
+  }, [state.tasks, state.enhancedImageUrl, state.uploadedImageUrl, state.customInstructions, runSingleTask]);
 
   const failedCount = state.tasks.filter(
     (t) => t.status === "error" && t.taskType === "roof"
@@ -560,6 +567,31 @@ export default function RoofSimulator() {
                 placeholder="Ex: Jean Tremblay"
                 className="w-full max-w-md px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
               />
+            </div>
+
+            <div className="mb-8">
+              <h2 className="text-lg font-bold text-gray-800 mb-2">
+                Instructions specifiques <span className="text-sm font-normal text-gray-500">(optionnel)</span>
+              </h2>
+              <p className="text-xs text-gray-500 mb-3">
+                Ajoutez ici des directives precises qui s&apos;appliqueront a chaque generation. Ex: &quot;revetement exterieur des lucarnes blanc&quot;, &quot;peindre les volets en noir&quot;, &quot;garage door painted dark gray&quot;, etc.
+              </p>
+              <textarea
+                value={state.customInstructions}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_CUSTOM_INSTRUCTIONS",
+                    instructions: e.target.value,
+                  })
+                }
+                placeholder="Ex: Le revetement exterieur des lucarnes doit etre blanc. Les volets doivent etre repeints en noir mat."
+                rows={3}
+                maxLength={500}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 resize-y"
+              />
+              <p className="text-xs text-gray-400 mt-1 text-right">
+                {state.customInstructions.length}/500
+              </p>
             </div>
 
             <ColorSelector

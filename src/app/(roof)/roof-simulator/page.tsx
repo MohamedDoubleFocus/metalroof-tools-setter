@@ -307,64 +307,58 @@ export default function RoofSimulator() {
   );
 
   // Phase 1: Run BOTH enhancements (front + back if applicable), then show checkpoint
-  const runEnhancementPhase = useCallback(async () => {
-    if (!state.uploadedImageUrl) return;
-    dispatch({ type: "SET_STEP", step: "generating" });
+  // Takes URLs directly to avoid stale-closure bug on initial trigger from handleGenerate
+  const runEnhancementPhase = useCallback(
+    async (frontSourceUrl: string, backSourceUrl: string | null) => {
+      dispatch({ type: "SET_STEP", step: "generating" });
 
-    const enhancementIndexes = findTaskIndexes(
-      state.tasks,
-      (t) => t.taskType === "enhancement"
-    );
+      type Job = { side: "front" | "back"; url: string; taskIndex: number };
+      const jobs: Job[] = [
+        { side: "front", url: frontSourceUrl, taskIndex: 0 },
+      ];
+      if (backSourceUrl) {
+        jobs.push({ side: "back", url: backSourceUrl, taskIndex: 1 });
+      }
 
-    // Reset enhancements
-    enhancementIndexes.forEach((i) => {
-      dispatch({
-        type: "UPDATE_TASK",
-        taskIndex: i,
-        update: { status: "pending", error: undefined, resultUrl: undefined },
+      // Reset enhancements
+      jobs.forEach((j) => {
+        dispatch({
+          type: "UPDATE_TASK",
+          taskIndex: j.taskIndex,
+          update: { status: "pending", error: undefined, resultUrl: undefined },
+        });
       });
-    });
 
-    await Promise.all(
-      enhancementIndexes.map(async (taskIndex) => {
-        const task = state.tasks[taskIndex];
-        const sourceUrl =
-          task.side === "front"
-            ? state.uploadedImageUrl
-            : state.backUploadedImageUrl;
-        if (!sourceUrl) return;
-        try {
-          const result = await runSingleTask(sourceUrl, "enhancement", taskIndex);
-          if (result) {
-            if (task.side === "front") {
-              enhancedUrlRef.current = result;
-              dispatch({ type: "SET_ENHANCED_URL", url: result });
-            } else {
-              backEnhancedUrlRef.current = result;
-              dispatch({ type: "SET_BACK_ENHANCED_URL", url: result });
+      await Promise.all(
+        jobs.map(async ({ side, url, taskIndex }) => {
+          try {
+            const result = await runSingleTask(url, "enhancement", taskIndex);
+            if (result) {
+              if (side === "front") {
+                enhancedUrlRef.current = result;
+                dispatch({ type: "SET_ENHANCED_URL", url: result });
+              } else {
+                backEnhancedUrlRef.current = result;
+                dispatch({ type: "SET_BACK_ENHANCED_URL", url: result });
+              }
             }
+          } catch (err) {
+            dispatch({
+              type: "UPDATE_TASK",
+              taskIndex,
+              update: {
+                status: "error",
+                error: err instanceof Error ? err.message : "Erreur enhancement",
+              },
+            });
           }
-        } catch (err) {
-          dispatch({
-            type: "UPDATE_TASK",
-            taskIndex,
-            update: {
-              status: "error",
-              error: err instanceof Error ? err.message : "Erreur enhancement",
-            },
-          });
-        }
-      })
-    );
+        })
+      );
 
-    dispatch({ type: "SET_STEP", step: "checkpoint_enhanced" });
-  }, [
-    state.tasks,
-    state.uploadedImageUrl,
-    state.backUploadedImageUrl,
-    runSingleTask,
-    findTaskIndexes,
-  ]);
+      dispatch({ type: "SET_STEP", step: "checkpoint_enhanced" });
+    },
+    [runSingleTask]
+  );
 
   // Phase 2: Run the FIRST roof for each side (front + back if applicable)
   const runFirstRoofPhase = useCallback(
@@ -526,13 +520,14 @@ export default function RoofSimulator() {
     enhancedUrlRef.current = null;
     backEnhancedUrlRef.current = null;
 
-    // Wait one tick so reducer applies, then run phase 1
-    setTimeout(() => {
-      runEnhancementPhase();
-    }, 0);
+    // Pass URLs directly — no closure dependency on state.tasks
+    const frontUrl = state.uploadedImageUrl;
+    const backUrl = state.hasBackPhoto ? state.backUploadedImageUrl : null;
+    runEnhancementPhase(frontUrl, backUrl);
   }, [
     state.uploadedImageUrl,
     state.hasBackPhoto,
+    state.backUploadedImageUrl,
     state.selectedColors,
     state.selectedStyles,
     canGenerate,
@@ -566,8 +561,16 @@ export default function RoofSimulator() {
   }, [getFrontEnhancedUrl, getBackEnhancedUrl, runFirstRoofPhase]);
 
   const handleRegenerateEnhanced = useCallback(() => {
-    runEnhancementPhase();
-  }, [runEnhancementPhase]);
+    if (!state.uploadedImageUrl) return;
+    const frontUrl = state.uploadedImageUrl;
+    const backUrl = state.hasBackPhoto ? state.backUploadedImageUrl : null;
+    runEnhancementPhase(frontUrl, backUrl);
+  }, [
+    state.uploadedImageUrl,
+    state.hasBackPhoto,
+    state.backUploadedImageUrl,
+    runEnhancementPhase,
+  ]);
 
   const handleSkipEnhanced = useCallback(() => {
     if (!state.uploadedImageUrl) return;

@@ -27,6 +27,12 @@ export const COLORS: Record<string, ColorDefinition> = {
     ral: "RAL 3009",
     hex: "#6B2D2F",
   },
+  "Deep Red": {
+    name: "Deep Red",
+    frenchName: "Rouge Fonce",
+    ral: "RAL 3011",
+    hex: "#781F19",
+  },
   Mocha: {
     name: "Mocha",
     frenchName: "Moka",

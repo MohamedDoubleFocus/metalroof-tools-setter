@@ -10,10 +10,13 @@ export type RoofStyle = "wave_tile" | "standing_seam";
 
 export type TaskType = "enhancement" | "roof";
 
+export type Side = "front" | "back";
+
 export interface GenerationTask {
   taskType: TaskType;
   colorKey: string;
   roofStyle: RoofStyle;
+  side: Side;
   status: "pending" | "creating" | "polling" | "success" | "error";
   taskId?: string;
   resultUrl?: string;
@@ -39,6 +42,8 @@ export type AppStep =
   | "upload"
   | "select_colors"
   | "generating"
+  | "checkpoint_enhanced"
+  | "checkpoint_first_roof"
   | "results";
 
 export interface AppState {
@@ -48,6 +53,14 @@ export interface AppState {
   uploadedImageUrl: string | null;
   uploadedImagePreview: string | null;
   enhancedImageUrl: string | null;
+  // Back photo (optional)
+  hasBackPhoto: boolean;
+  backUploadedFile: File | null;
+  backUploadedImageUrl: string | null;
+  backUploadedImagePreview: string | null;
+  backEnhancedImageUrl: string | null;
+  backUploadLoading: boolean;
+  // Other
   address: string | null;
   clientName: string;
   customInstructions: string;
@@ -64,6 +77,11 @@ export type AppAction =
   | { type: "SET_FILE"; file: File; preview: string }
   | { type: "SET_UPLOADED_URL"; url: string; preview?: string }
   | { type: "SET_UPLOAD_LOADING"; loading: boolean }
+  | { type: "SET_HAS_BACK_PHOTO"; value: boolean }
+  | { type: "SET_BACK_FILE"; file: File; preview: string }
+  | { type: "SET_BACK_UPLOADED_URL"; url: string; preview?: string }
+  | { type: "SET_BACK_UPLOAD_LOADING"; loading: boolean }
+  | { type: "SET_BACK_ENHANCED_URL"; url: string }
   | { type: "SET_ADDRESS"; address: string }
   | { type: "SET_CLIENT_NAME"; name: string }
   | { type: "SET_CUSTOM_INSTRUCTIONS"; instructions: string }
@@ -79,4 +97,5 @@ export type AppAction =
   | { type: "GENERATION_COMPLETE" }
   | { type: "SET_PDF_LOADING"; loading: boolean }
   | { type: "SET_ERROR"; error: string | null }
+  | { type: "SET_STEP"; step: AppStep }
   | { type: "RESET" };

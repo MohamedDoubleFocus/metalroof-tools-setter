@@ -4,9 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Props {
   onUploaded: (file: File, preview: string, remoteUrl: string) => void;
+  disablePaste?: boolean;
+  label?: string;
+  compact?: boolean;
 }
 
-export default function ImageUploader({ onUploaded }: Props) {
+export default function ImageUploader({
+  onUploaded,
+  disablePaste = false,
+  label,
+  compact = false,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -71,6 +79,7 @@ export default function ImageUploader({ onUploaded }: Props) {
 
   // Listen for clipboard paste events globally
   useEffect(() => {
+    if (disablePaste) return;
     const handlePaste = (e: ClipboardEvent) => {
       // Skip if user is pasting into an input/textarea
       const target = e.target as HTMLElement | null;
@@ -108,10 +117,10 @@ export default function ImageUploader({ onUploaded }: Props) {
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [handleFile]);
+  }, [handleFile, disablePaste]);
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className={compact ? "" : "max-w-2xl mx-auto"}>
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -121,8 +130,9 @@ export default function ImageUploader({ onUploaded }: Props) {
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
         className={`
-          border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer
+          border-2 border-dashed rounded-2xl text-center cursor-pointer
           transition-all duration-200
+          ${compact ? "p-6" : "p-12"}
           ${
             dragging || pasteFlash
               ? "border-accent bg-red-50 scale-[1.02]"
@@ -151,26 +161,30 @@ export default function ImageUploader({ onUploaded }: Props) {
           </div>
         ) : (
           <>
-            <div className="text-5xl mb-4">🏠</div>
-            <p className="text-lg font-semibold text-gray-700">
-              Déposez votre photo ici
+            <div className={compact ? "text-3xl mb-2" : "text-5xl mb-4"}>🏠</div>
+            <p className={`font-semibold text-gray-700 ${compact ? "text-base" : "text-lg"}`}>
+              {label || "Déposez votre photo ici"}
             </p>
             <p className="text-sm text-gray-500 mt-1">
               ou cliquez pour parcourir vos fichiers
             </p>
-            <div className="flex items-center justify-center gap-2 mt-3">
-              <span className="text-xs text-gray-400">ou collez avec</span>
-              <kbd className="px-2 py-0.5 bg-gray-100 border border-gray-300 rounded text-[11px] font-mono text-gray-600">
-                Ctrl
-              </kbd>
-              <span className="text-xs text-gray-400">+</span>
-              <kbd className="px-2 py-0.5 bg-gray-100 border border-gray-300 rounded text-[11px] font-mono text-gray-600">
-                V
-              </kbd>
-            </div>
-            <p className="text-xs text-gray-400 mt-3">
-              Formats acceptés : JPG, PNG, WebP — Max 10 Mo
-            </p>
+            {!disablePaste && (
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <span className="text-xs text-gray-400">ou collez avec</span>
+                <kbd className="px-2 py-0.5 bg-gray-100 border border-gray-300 rounded text-[11px] font-mono text-gray-600">
+                  Ctrl
+                </kbd>
+                <span className="text-xs text-gray-400">+</span>
+                <kbd className="px-2 py-0.5 bg-gray-100 border border-gray-300 rounded text-[11px] font-mono text-gray-600">
+                  V
+                </kbd>
+              </div>
+            )}
+            {!compact && (
+              <p className="text-xs text-gray-400 mt-3">
+                Formats acceptés : JPG, PNG, WebP — Max 10 Mo
+              </p>
+            )}
           </>
         )}
       </div>

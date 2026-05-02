@@ -26,6 +26,12 @@ const initialState: AppState = {
   uploadedImageUrl: null,
   uploadedImagePreview: null,
   enhancedImageUrl: null,
+  hasBackPhoto: false,
+  backUploadedFile: null,
+  backUploadedImageUrl: null,
+  backUploadedImagePreview: null,
+  backEnhancedImageUrl: null,
+  backUploadLoading: false,
   address: null,
   clientName: "",
   customInstructions: "",
@@ -58,6 +64,40 @@ function reducer(state: AppState, action: AppAction): AppState {
       };
     case "SET_UPLOAD_LOADING":
       return { ...state, uploadLoading: action.loading };
+    case "SET_HAS_BACK_PHOTO":
+      return {
+        ...state,
+        hasBackPhoto: action.value,
+        // Clear back photo data when toggling off
+        ...(action.value
+          ? {}
+          : {
+              backUploadedFile: null,
+              backUploadedImageUrl: null,
+              backUploadedImagePreview: null,
+              backEnhancedImageUrl: null,
+              backUploadLoading: false,
+            }),
+      };
+    case "SET_BACK_FILE":
+      return {
+        ...state,
+        backUploadedFile: action.file,
+        backUploadedImagePreview: action.preview,
+        backUploadLoading: true,
+      };
+    case "SET_BACK_UPLOADED_URL":
+      return {
+        ...state,
+        backUploadedImageUrl: action.url,
+        backUploadedImagePreview:
+          action.preview || state.backUploadedImagePreview,
+        backUploadLoading: false,
+      };
+    case "SET_BACK_UPLOAD_LOADING":
+      return { ...state, backUploadLoading: action.loading };
+    case "SET_BACK_ENHANCED_URL":
+      return { ...state, backEnhancedImageUrl: action.url };
     case "SET_ADDRESS":
       return { ...state, address: action.address };
     case "SET_CLIENT_NAME":
@@ -102,6 +142,8 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, pdfLoading: action.loading };
     case "SET_ERROR":
       return { ...state, error: action.error };
+    case "SET_STEP":
+      return { ...state, step: action.step };
     case "RESET":
       return initialState;
     default:
@@ -112,6 +154,7 @@ function reducer(state: AppState, action: AppAction): AppState {
 export default function RoofSimulator() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const enhancedUrlRef = useRef<string | null>(null);
+  const backEnhancedUrlRef = useRef<string | null>(null);
 
   const handleInputMode = useCallback((mode: InputMode) => {
     dispatch({ type: "SET_INPUT_MODE", mode });
@@ -133,8 +176,18 @@ export default function RoofSimulator() {
     []
   );
 
+  const handleBackUploaded = useCallback(
+    (_file: File, preview: string, remoteUrl: string) => {
+      dispatch({ type: "SET_BACK_FILE", file: _file, preview });
+      dispatch({ type: "SET_BACK_UPLOADED_URL", url: remoteUrl });
+    },
+    []
+  );
+
   const canGenerate =
-    state.selectedColors.length >= 1 && state.selectedStyles.length >= 1;
+    state.selectedColors.length >= 1 &&
+    state.selectedStyles.length >= 1 &&
+    (!state.hasBackPhoto || !!state.backUploadedImageUrl);
 
   // Phase 1: Create task on Kie.AI, get taskId back immediately
   const createKieTask = useCallback(
@@ -238,101 +291,322 @@ export default function RoofSimulator() {
     [createKieTask, pollUntilDone]
   );
 
-  const handleGenerate = useCallback(async () => {
-    if (!state.uploadedImageUrl || !canGenerate) return;
+  // Helper: find task indexes by criteria
+  const findTaskIndexes = useCallback(
+    (
+      tasks: GenerationTask[],
+      predicate: (t: GenerationTask) => boolean
+    ): number[] => {
+      const out: number[] = [];
+      tasks.forEach((t, i) => {
+        if (predicate(t)) out.push(i);
+      });
+      return out;
+    },
+    []
+  );
 
-    const tasks: GenerationTask[] = [];
+  // Phase 1: Run BOTH enhancements (front + back if applicable), then show checkpoint
+  const runEnhancementPhase = useCallback(async () => {
+    if (!state.uploadedImageUrl) return;
+    dispatch({ type: "SET_STEP", step: "generating" });
 
-    tasks.push({
-      taskType: "enhancement",
-      colorKey: "",
-      roofStyle: "wave_tile",
-      status: "pending",
+    const enhancementIndexes = findTaskIndexes(
+      state.tasks,
+      (t) => t.taskType === "enhancement"
+    );
+
+    // Reset enhancements
+    enhancementIndexes.forEach((i) => {
+      dispatch({
+        type: "UPDATE_TASK",
+        taskIndex: i,
+        update: { status: "pending", error: undefined, resultUrl: undefined },
+      });
     });
 
-    for (const colorKey of state.selectedColors) {
-      for (const style of state.selectedStyles) {
-        tasks.push({
-          taskType: "roof",
-          colorKey,
-          roofStyle: style,
-          status: "pending",
-        });
-      }
-    }
-
-    dispatch({ type: "START_GENERATION", tasks });
-    enhancedUrlRef.current = null;
-
-    try {
-      // Step 1: Enhancement
-      let enhancedImageUrl = state.uploadedImageUrl;
-      try {
-        const result = await runSingleTask(
-          state.uploadedImageUrl,
-          "enhancement",
-          0
-        );
-        if (result) {
-          enhancedImageUrl = result;
-          enhancedUrlRef.current = result;
-          dispatch({ type: "SET_ENHANCED_URL", url: result });
+    await Promise.all(
+      enhancementIndexes.map(async (taskIndex) => {
+        const task = state.tasks[taskIndex];
+        const sourceUrl =
+          task.side === "front"
+            ? state.uploadedImageUrl
+            : state.backUploadedImageUrl;
+        if (!sourceUrl) return;
+        try {
+          const result = await runSingleTask(sourceUrl, "enhancement", taskIndex);
+          if (result) {
+            if (task.side === "front") {
+              enhancedUrlRef.current = result;
+              dispatch({ type: "SET_ENHANCED_URL", url: result });
+            } else {
+              backEnhancedUrlRef.current = result;
+              dispatch({ type: "SET_BACK_ENHANCED_URL", url: result });
+            }
+          }
+        } catch (err) {
+          dispatch({
+            type: "UPDATE_TASK",
+            taskIndex,
+            update: {
+              status: "error",
+              error: err instanceof Error ? err.message : "Erreur enhancement",
+            },
+          });
         }
-      } catch {
+      })
+    );
+
+    dispatch({ type: "SET_STEP", step: "checkpoint_enhanced" });
+  }, [
+    state.tasks,
+    state.uploadedImageUrl,
+    state.backUploadedImageUrl,
+    runSingleTask,
+    findTaskIndexes,
+  ]);
+
+  // Phase 2: Run the FIRST roof for each side (front + back if applicable)
+  const runFirstRoofPhase = useCallback(
+    async (frontEnhancedUrl: string, backEnhancedUrl: string | null) => {
+      dispatch({ type: "SET_STEP", step: "generating" });
+
+      const firstColor = state.selectedColors[0];
+      const firstStyle = state.selectedStyles[0];
+
+      const firstRoofIndexes = findTaskIndexes(
+        state.tasks,
+        (t) =>
+          t.taskType === "roof" &&
+          t.colorKey === firstColor &&
+          t.roofStyle === firstStyle
+      );
+
+      // Reset
+      firstRoofIndexes.forEach((i) => {
         dispatch({
           type: "UPDATE_TASK",
-          taskIndex: 0,
-          update: { status: "error", error: "Enhancement echoue, on continue" },
+          taskIndex: i,
+          update: { status: "pending", error: undefined, resultUrl: undefined },
         });
+      });
+
+      await Promise.all(
+        firstRoofIndexes.map(async (taskIndex) => {
+          const task = state.tasks[taskIndex];
+          const sourceUrl =
+            task.side === "front" ? frontEnhancedUrl : backEnhancedUrl;
+          if (!sourceUrl) return;
+          try {
+            await runSingleTask(
+              sourceUrl,
+              "roof",
+              taskIndex,
+              task.colorKey,
+              task.roofStyle,
+              state.customInstructions
+            );
+          } catch (err) {
+            dispatch({
+              type: "UPDATE_TASK",
+              taskIndex,
+              update: {
+                status: "error",
+                error: err instanceof Error ? err.message : "Erreur",
+              },
+            });
+          }
+        })
+      );
+
+      dispatch({ type: "SET_STEP", step: "checkpoint_first_roof" });
+    },
+    [state.tasks, state.selectedColors, state.selectedStyles, state.customInstructions, runSingleTask, findTaskIndexes]
+  );
+
+  // Phase 3: Run all remaining roof tasks in parallel batches
+  const runRemainingRoofsPhase = useCallback(
+    async (frontEnhancedUrl: string, backEnhancedUrl: string | null) => {
+      dispatch({ type: "SET_STEP", step: "generating" });
+
+      const firstColor = state.selectedColors[0];
+      const firstStyle = state.selectedStyles[0];
+
+      const remainingIndexes = findTaskIndexes(
+        state.tasks,
+        (t) =>
+          t.taskType === "roof" &&
+          !(t.colorKey === firstColor && t.roofStyle === firstStyle)
+      );
+
+      if (remainingIndexes.length === 0) {
+        dispatch({ type: "GENERATION_COMPLETE" });
+        return;
       }
 
-      // Step 2: Roof tasks — 3 at a time
-      const roofTasks = tasks
-        .map((t, i) => ({ ...t, index: i }))
-        .filter((t) => t.taskType === "roof");
-
       const CONCURRENCY = 3;
-      for (let i = 0; i < roofTasks.length; i += CONCURRENCY) {
-        const batch = roofTasks.slice(i, i + CONCURRENCY);
+      for (let i = 0; i < remainingIndexes.length; i += CONCURRENCY) {
+        const batch = remainingIndexes.slice(i, i + CONCURRENCY);
         await Promise.all(
-          batch.map((task) =>
-            runSingleTask(
-              enhancedImageUrl,
+          batch.map((taskIndex) => {
+            const task = state.tasks[taskIndex];
+            const sourceUrl =
+              task.side === "front" ? frontEnhancedUrl : backEnhancedUrl;
+            if (!sourceUrl) {
+              dispatch({
+                type: "UPDATE_TASK",
+                taskIndex,
+                update: { status: "error", error: "Photo source manquante" },
+              });
+              return Promise.resolve();
+            }
+            return runSingleTask(
+              sourceUrl,
               "roof",
-              task.index,
+              taskIndex,
               task.colorKey,
               task.roofStyle,
               state.customInstructions
             ).catch((err) => {
               dispatch({
                 type: "UPDATE_TASK",
-                taskIndex: task.index,
+                taskIndex,
                 update: {
                   status: "error",
                   error: err instanceof Error ? err.message : "Erreur",
                 },
               });
-            })
-          )
+            });
+          })
         );
       }
 
       dispatch({ type: "GENERATION_COMPLETE" });
-    } catch (err) {
-      dispatch({
-        type: "SET_ERROR",
-        error:
-          err instanceof Error ? err.message : "Erreur lors de la generation",
+    },
+    [state.tasks, state.selectedColors, state.selectedStyles, state.customInstructions, runSingleTask, findTaskIndexes]
+  );
+
+  // Entry point: build task list and start phase 1
+  const handleGenerate = useCallback(async () => {
+    if (!state.uploadedImageUrl || !canGenerate) return;
+
+    const sides: ("front" | "back")[] = state.hasBackPhoto
+      ? ["front", "back"]
+      : ["front"];
+
+    const tasks: GenerationTask[] = [];
+
+    // Enhancement tasks (one per side)
+    for (const side of sides) {
+      tasks.push({
+        taskType: "enhancement",
+        colorKey: "",
+        roofStyle: "wave_tile",
+        side,
+        status: "pending",
       });
     }
-  }, [state.uploadedImageUrl, state.selectedColors, state.selectedStyles, state.customInstructions, canGenerate, runSingleTask]);
+
+    // Roof tasks: for each color × style × side
+    for (const colorKey of state.selectedColors) {
+      for (const style of state.selectedStyles) {
+        for (const side of sides) {
+          tasks.push({
+            taskType: "roof",
+            colorKey,
+            roofStyle: style,
+            side,
+            status: "pending",
+          });
+        }
+      }
+    }
+
+    dispatch({ type: "START_GENERATION", tasks });
+    enhancedUrlRef.current = null;
+    backEnhancedUrlRef.current = null;
+
+    // Wait one tick so reducer applies, then run phase 1
+    setTimeout(() => {
+      runEnhancementPhase();
+    }, 0);
+  }, [
+    state.uploadedImageUrl,
+    state.hasBackPhoto,
+    state.selectedColors,
+    state.selectedStyles,
+    canGenerate,
+    runEnhancementPhase,
+  ]);
+
+  // Helpers to grab front/back enhanced URLs (with fallback to original)
+  const getFrontEnhancedUrl = useCallback(() => {
+    return (
+      enhancedUrlRef.current ||
+      state.enhancedImageUrl ||
+      state.uploadedImageUrl
+    );
+  }, [state.enhancedImageUrl, state.uploadedImageUrl]);
+
+  const getBackEnhancedUrl = useCallback(() => {
+    if (!state.hasBackPhoto) return null;
+    return (
+      backEnhancedUrlRef.current ||
+      state.backEnhancedImageUrl ||
+      state.backUploadedImageUrl
+    );
+  }, [state.hasBackPhoto, state.backEnhancedImageUrl, state.backUploadedImageUrl]);
+
+  // Checkpoint #1 actions
+  const handleApproveEnhanced = useCallback(() => {
+    const front = getFrontEnhancedUrl();
+    const back = getBackEnhancedUrl();
+    if (!front) return;
+    runFirstRoofPhase(front, back);
+  }, [getFrontEnhancedUrl, getBackEnhancedUrl, runFirstRoofPhase]);
+
+  const handleRegenerateEnhanced = useCallback(() => {
+    runEnhancementPhase();
+  }, [runEnhancementPhase]);
+
+  const handleSkipEnhanced = useCallback(() => {
+    if (!state.uploadedImageUrl) return;
+    enhancedUrlRef.current = state.uploadedImageUrl;
+    if (state.hasBackPhoto && state.backUploadedImageUrl) {
+      backEnhancedUrlRef.current = state.backUploadedImageUrl;
+    }
+    runFirstRoofPhase(
+      state.uploadedImageUrl,
+      state.hasBackPhoto ? state.backUploadedImageUrl : null
+    );
+  }, [
+    state.uploadedImageUrl,
+    state.hasBackPhoto,
+    state.backUploadedImageUrl,
+    runFirstRoofPhase,
+  ]);
+
+  // Checkpoint #2 actions
+  const handleApproveFirstRoof = useCallback(() => {
+    const front = getFrontEnhancedUrl();
+    const back = getBackEnhancedUrl();
+    if (!front) return;
+    runRemainingRoofsPhase(front, back);
+  }, [getFrontEnhancedUrl, getBackEnhancedUrl, runRemainingRoofsPhase]);
+
+  const handleRegenerateFirstRoof = useCallback(() => {
+    const front = getFrontEnhancedUrl();
+    const back = getBackEnhancedUrl();
+    if (!front) return;
+    runFirstRoofPhase(front, back);
+  }, [getFrontEnhancedUrl, getBackEnhancedUrl, runFirstRoofPhase]);
 
   // Retry only failed tasks
   const handleRetryFailed = useCallback(async () => {
-    const imageUrl = enhancedUrlRef.current || state.enhancedImageUrl || state.uploadedImageUrl;
-    if (!imageUrl) return;
+    const frontUrl = getFrontEnhancedUrl();
+    const backUrl = getBackEnhancedUrl();
+    if (!frontUrl) return;
 
-    // Switch back to generating view
     dispatch({ type: "SET_ERROR", error: null });
 
     const failedTasks = state.tasks
@@ -341,7 +615,6 @@ export default function RoofSimulator() {
 
     if (failedTasks.length === 0) return;
 
-    // Reset failed tasks to pending
     for (const task of failedTasks) {
       dispatch({
         type: "UPDATE_TASK",
@@ -350,20 +623,22 @@ export default function RoofSimulator() {
       });
     }
 
-    // Go back to generating step
-    // We need a way to show progress — set step back
-    const hasResults = state.tasks.some((t) => t.status === "success" && t.taskType === "roof");
-    if (hasResults) {
-      // Stay on results but show generating state via step
-    }
-
     const CONCURRENCY = 3;
     for (let i = 0; i < failedTasks.length; i += CONCURRENCY) {
       const batch = failedTasks.slice(i, i + CONCURRENCY);
       await Promise.all(
-        batch.map((task) =>
-          runSingleTask(
-            imageUrl,
+        batch.map((task) => {
+          const sourceUrl = task.side === "front" ? frontUrl : backUrl;
+          if (!sourceUrl) {
+            dispatch({
+              type: "UPDATE_TASK",
+              taskIndex: task.index,
+              update: { status: "error", error: "Photo source manquante" },
+            });
+            return Promise.resolve();
+          }
+          return runSingleTask(
+            sourceUrl,
             "roof",
             task.index,
             task.colorKey,
@@ -378,11 +653,17 @@ export default function RoofSimulator() {
                 error: err instanceof Error ? err.message : "Erreur",
               },
             });
-          })
-        )
+          });
+        })
       );
     }
-  }, [state.tasks, state.enhancedImageUrl, state.uploadedImageUrl, state.customInstructions, runSingleTask]);
+  }, [
+    state.tasks,
+    state.customInstructions,
+    getFrontEnhancedUrl,
+    getBackEnhancedUrl,
+    runSingleTask,
+  ]);
 
   const failedCount = state.tasks.filter(
     (t) => t.status === "error" && t.taskType === "roof"
@@ -395,46 +676,57 @@ export default function RoofSimulator() {
     dispatch({ type: "SET_PDF_LOADING", loading: true });
 
     try {
-      const colorResults: Record<
-        string,
-        { waveTileUrl?: string; standingSeamUrl?: string }
-      > = {};
-      for (const task of state.tasks) {
-        if (
-          task.taskType !== "roof" ||
-          task.status !== "success" ||
-          !task.resultUrl
-        )
-          continue;
-        if (!colorResults[task.colorKey]) colorResults[task.colorKey] = {};
-        if (task.roofStyle === "wave_tile") {
-          colorResults[task.colorKey].waveTileUrl = task.resultUrl;
-        } else {
-          colorResults[task.colorKey].standingSeamUrl = task.resultUrl;
+      // Build per-side color results
+      const buildSideResults = (side: "front" | "back") => {
+        const colorResults: Record<
+          string,
+          { waveTileUrl?: string; standingSeamUrl?: string }
+        > = {};
+        for (const task of state.tasks) {
+          if (
+            task.taskType !== "roof" ||
+            task.side !== side ||
+            task.status !== "success" ||
+            !task.resultUrl
+          )
+            continue;
+          if (!colorResults[task.colorKey]) colorResults[task.colorKey] = {};
+          if (task.roofStyle === "wave_tile") {
+            colorResults[task.colorKey].waveTileUrl = task.resultUrl;
+          } else {
+            colorResults[task.colorKey].standingSeamUrl = task.resultUrl;
+          }
         }
-      }
+        return Object.entries(colorResults)
+          .filter(([, v]) => v.waveTileUrl || v.standingSeamUrl)
+          .map(([colorKey, v]) => ({
+            colorKey,
+            waveTileUrl: v.waveTileUrl,
+            standingSeamUrl: v.standingSeamUrl,
+          }));
+      };
 
-      const results = Object.entries(colorResults)
-        .filter(([, v]) => v.waveTileUrl || v.standingSeamUrl)
-        .map(([colorKey, v]) => ({
-          colorKey,
-          waveTileUrl: v.waveTileUrl,
-          standingSeamUrl: v.standingSeamUrl,
-        }));
+      const frontResults = buildSideResults("front");
+      const backResults = state.hasBackPhoto ? buildSideResults("back") : [];
 
-      if (results.length === 0) {
+      if (frontResults.length === 0 && backResults.length === 0) {
         throw new Error("Aucune image reussie a inclure dans le PDF");
       }
 
-      const originalUrl =
+      const frontOriginalUrl =
         state.enhancedImageUrl || state.uploadedImageUrl;
+      const backOriginalUrl = state.hasBackPhoto
+        ? state.backEnhancedImageUrl || state.backUploadedImageUrl
+        : null;
 
       const res = await fetch("/api/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          originalImageUrl: originalUrl,
-          results,
+          originalImageUrl: frontOriginalUrl,
+          results: frontResults,
+          backOriginalImageUrl: backOriginalUrl,
+          backResults,
           clientName: state.clientName || undefined,
         }),
       });
@@ -469,7 +761,15 @@ export default function RoofSimulator() {
     } finally {
       dispatch({ type: "SET_PDF_LOADING", loading: false });
     }
-  }, [state.tasks, state.uploadedImageUrl, state.enhancedImageUrl, state.clientName]);
+  }, [
+    state.tasks,
+    state.uploadedImageUrl,
+    state.enhancedImageUrl,
+    state.hasBackPhoto,
+    state.backUploadedImageUrl,
+    state.backEnhancedImageUrl,
+    state.clientName,
+  ]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -570,6 +870,74 @@ export default function RoofSimulator() {
             </div>
 
             <div className="mb-8">
+              <label className="flex items-start gap-3 cursor-pointer p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={state.hasBackPhoto}
+                  onChange={(e) =>
+                    dispatch({
+                      type: "SET_HAS_BACK_PHOTO",
+                      value: e.target.checked,
+                    })
+                  }
+                  className="mt-1 w-4 h-4 accent-accent"
+                />
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-800">
+                    Inclure une photo arriere{" "}
+                    <span className="text-sm font-normal text-gray-500">
+                      (optionnel)
+                    </span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Genere aussi les variantes pour l&apos;arriere de la maison.
+                    Sera ajoute en section separee a la fin du PDF.
+                  </p>
+                </div>
+              </label>
+
+              {state.hasBackPhoto && (
+                <div className="mt-4 ml-7">
+                  {state.backUploadedImagePreview ? (
+                    <div className="flex items-start gap-4">
+                      <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm w-48">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={state.backUploadedImagePreview}
+                          alt="Photo arriere"
+                          className="w-full h-auto"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 mb-2">
+                          Photo arriere ajoutee
+                        </p>
+                        <button
+                          onClick={() =>
+                            dispatch({
+                              type: "SET_HAS_BACK_PHOTO",
+                              value: false,
+                            })
+                          }
+                          className="text-xs text-gray-500 underline hover:text-gray-700"
+                        >
+                          Retirer
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <ImageUploader
+                      onUploaded={handleBackUploaded}
+                      disablePaste={true}
+                      label="Deposez la photo arriere ici"
+                      compact={true}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="mb-8">
               <h2 className="text-lg font-bold text-gray-800 mb-2">
                 Instructions specifiques <span className="text-sm font-normal text-gray-500">(optionnel)</span>
               </h2>
@@ -616,6 +984,259 @@ export default function RoofSimulator() {
         )}
 
         {state.step === "generating" && <ProgressPanel tasks={state.tasks} />}
+
+        {state.step === "checkpoint_enhanced" && (() => {
+          const frontEnhTask = state.tasks.find(
+            (t) => t.taskType === "enhancement" && t.side === "front"
+          );
+          const backEnhTask = state.tasks.find(
+            (t) => t.taskType === "enhancement" && t.side === "back"
+          );
+          const frontError = frontEnhTask?.status === "error";
+          const backError = backEnhTask?.status === "error";
+          const allFailed = frontError && (state.hasBackPhoto ? backError : true);
+
+          const SidePair = ({
+            label,
+            originalPreview,
+            enhancedUrl,
+            errored,
+          }: {
+            label: string;
+            originalPreview: string;
+            enhancedUrl: string | null;
+            errored: boolean;
+          }) => (
+            <div className="mb-4">
+              {state.hasBackPhoto && (
+                <p className="text-sm font-bold text-gray-700 mb-2">{label}</p>
+              )}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">
+                    Original
+                  </p>
+                  <div className="rounded-xl overflow-hidden border border-gray-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={originalPreview}
+                      alt={`${label} original`}
+                      className="w-full h-auto"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">
+                    {errored ? "Echec" : "Amelioree"}
+                  </p>
+                  {errored || !enhancedUrl ? (
+                    <div className="rounded-xl border-2 border-yellow-300 bg-yellow-50 h-full min-h-[150px] flex items-center justify-center text-sm text-yellow-700 px-4 text-center">
+                      L&apos;amelioration a echoue
+                    </div>
+                  ) : (
+                    <div className="rounded-xl overflow-hidden border-2 border-accent">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={enhancedUrl}
+                        alt={`${label} amelioree`}
+                        className="w-full h-auto"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+
+          return (
+            <div className="max-w-3xl mx-auto">
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs font-semibold text-blue-700 mb-3">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full" />
+                  Etape 1/2 — Validation
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  L&apos;amelioration {state.hasBackPhoto ? "des photos" : "de la photo"} te convient-elle ?
+                </h2>
+                <p className="text-gray-500 mt-2">
+                  C&apos;est {state.hasBackPhoto ? "la base" : "la photo"} qui sera utilisee pour generer toutes les variantes de toiture.
+                </p>
+              </div>
+
+              <SidePair
+                label="AVANT"
+                originalPreview={state.uploadedImagePreview || state.uploadedImageUrl || ""}
+                enhancedUrl={state.enhancedImageUrl}
+                errored={frontError}
+              />
+
+              {state.hasBackPhoto && (
+                <SidePair
+                  label="ARRIERE"
+                  originalPreview={state.backUploadedImagePreview || state.backUploadedImageUrl || ""}
+                  enhancedUrl={state.backEnhancedImageUrl}
+                  errored={backError}
+                />
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
+                <button
+                  onClick={handleApproveEnhanced}
+                  className="px-6 py-3 bg-accent text-white rounded-xl font-semibold hover:bg-accent-light transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  disabled={allFailed}
+                >
+                  Continuer avec {state.hasBackPhoto ? "ces photos" : "cette photo"}
+                </button>
+                <button
+                  onClick={handleRegenerateEnhanced}
+                  className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Refaire l&apos;amelioration
+                </button>
+                <button
+                  onClick={handleSkipEnhanced}
+                  className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Utiliser {state.hasBackPhoto ? "les originales" : "l'originale"}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {state.step === "checkpoint_first_roof" && (() => {
+          const firstColor = state.selectedColors[0];
+          const firstStyle = state.selectedStyles[0];
+          const frontFirst = state.tasks.find(
+            (t) =>
+              t.taskType === "roof" &&
+              t.side === "front" &&
+              t.colorKey === firstColor &&
+              t.roofStyle === firstStyle
+          );
+          const backFirst = state.tasks.find(
+            (t) =>
+              t.taskType === "roof" &&
+              t.side === "back" &&
+              t.colorKey === firstColor &&
+              t.roofStyle === firstStyle
+          );
+          const firstColorKey = frontFirst?.colorKey;
+          const styleLabel =
+            frontFirst?.roofStyle === "wave_tile" ? "Tuile Onde" : "Joint Debout";
+          const allFailed =
+            frontFirst?.status === "error" &&
+            (state.hasBackPhoto ? backFirst?.status === "error" : true);
+
+          const SideRoof = ({
+            label,
+            task,
+          }: {
+            label: string;
+            task: GenerationTask | undefined;
+          }) => (
+            <div>
+              {state.hasBackPhoto && (
+                <p className="text-sm font-bold text-gray-700 mb-2 text-center">
+                  {label}
+                </p>
+              )}
+              {task?.status === "error" ? (
+                <div className="rounded-xl border-2 border-yellow-300 bg-yellow-50 min-h-[200px] flex items-center justify-center text-sm text-yellow-700 px-4 text-center">
+                  Echec : {task.error || "erreur inconnue"}
+                </div>
+              ) : (
+                <div className="rounded-xl overflow-hidden border-2 border-accent">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={task?.resultUrl || ""}
+                    alt={`${label} premiere toiture`}
+                    className="w-full h-auto"
+                  />
+                </div>
+              )}
+            </div>
+          );
+
+          return (
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs font-semibold text-blue-700 mb-3">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full" />
+                  Etape 2/2 — Validation
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  {state.hasBackPhoto
+                    ? "Ces premieres toitures te conviennent-elles ?"
+                    : "Cette premiere toiture te convient-elle ?"}
+                </h2>
+                <p className="text-gray-500 mt-2">
+                  Si oui, on lance les autres couleurs/styles en parallele. Sinon, ajuste les instructions et refais.
+                </p>
+                <p className="text-xs font-semibold text-gray-500 uppercase mt-3">
+                  {firstColorKey ? `${firstColorKey} — ${styleLabel}` : ""}
+                </p>
+              </div>
+
+              <div className={`mb-6 ${state.hasBackPhoto ? "grid md:grid-cols-2 gap-4" : ""}`}>
+                <SideRoof label="AVANT" task={frontFirst} />
+                {state.hasBackPhoto && (
+                  <SideRoof label="ARRIERE" task={backFirst} />
+                )}
+              </div>
+
+              {/* Inline error banner override */}
+              {allFailed && (
+                <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800">
+                  <p className="font-semibold">
+                    {state.hasBackPhoto
+                      ? "Les deux premieres toitures ont echoue"
+                      : "La premiere toiture a echoue"}
+                  </p>
+                  <p className="text-sm mt-1">Reessaie.</p>
+                </div>
+              )}
+
+              <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Ajuster les instructions specifiques (optionnel)
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Si la premiere toiture montre un probleme (ex: gouttieres qui changent), corrige ici puis clique &quot;Refaire&quot;.
+                </p>
+                <textarea
+                  value={state.customInstructions}
+                  onChange={(e) =>
+                    dispatch({
+                      type: "SET_CUSTOM_INSTRUCTIONS",
+                      instructions: e.target.value,
+                    })
+                  }
+                  placeholder="Ex: gutters MUST stay white, do not change soffits"
+                  rows={2}
+                  maxLength={500}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 resize-y bg-white"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={handleApproveFirstRoof}
+                  disabled={allFailed}
+                  className="px-6 py-3 bg-accent text-white rounded-xl font-semibold hover:bg-accent-light transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  Continuer avec les autres
+                </button>
+                <button
+                  onClick={handleRegenerateFirstRoof}
+                  className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  {state.hasBackPhoto ? "Refaire ces toitures" : "Refaire cette toiture"}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
         {state.step === "results" && (
           <div>

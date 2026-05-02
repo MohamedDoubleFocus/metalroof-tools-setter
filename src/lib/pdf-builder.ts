@@ -18,6 +18,9 @@ interface ColorPage {
 interface PdfParams {
   originalImageBuffer: Buffer;
   colorPages: ColorPage[];
+  // Optional back-side data
+  backOriginalImageBuffer?: Buffer;
+  backColorPages?: ColorPage[];
   logoBuffer: Buffer;
   clientName?: string;
 }
@@ -27,13 +30,9 @@ function drawBlackHeader(
   logoBuffer: Buffer,
   rightText?: string
 ) {
-  // Black banner
   doc.rect(0, 0, PAGE_W, HEADER_H).fill(BLACK);
-
-  // Logo (white on black)
   doc.image(logoBuffer, MARGIN, 12, { height: 36 });
 
-  // Right text if provided
   if (rightText) {
     doc
       .fontSize(14)
@@ -60,8 +59,152 @@ function drawFooter(doc: PDFKit.PDFDocument) {
     );
 }
 
+function drawColorPage(
+  doc: PDFKit.PDFDocument,
+  page: ColorPage,
+  logoBuffer: Buffer,
+  sideLabel?: string
+) {
+  doc.addPage();
+
+  const colorLabel =
+    page.color.ral !== "N/A"
+      ? `${page.color.frenchName} — ${page.color.ral}`
+      : page.color.frenchName;
+
+  const headerLabel = sideLabel ? `${sideLabel} • ${colorLabel}` : colorLabel;
+  drawBlackHeader(doc, logoBuffer, headerLabel);
+
+  const hasWave = !!page.waveTileBuffer;
+  const hasSeam = !!page.standingSeamBuffer;
+  const hasBoth = hasWave && hasSeam;
+
+  const imgW = CONTENT_W * 0.92;
+  const imgH = hasBoth ? 270 : 480;
+  const imgX = (PAGE_W - imgW) / 2;
+  let curY = HEADER_H + 14;
+
+  if (hasWave) {
+    doc.image(page.waveTileBuffer!, imgX, curY, {
+      fit: [imgW, imgH],
+      align: "center",
+      valign: "center",
+    });
+    curY += imgH + 4;
+
+    doc.rect(imgX, curY, 14, 14).fill(page.color.hex);
+    doc
+      .fontSize(9)
+      .fillColor("#333333")
+      .font("Helvetica-Bold")
+      .text(
+        `Tuile Ondulée Européenne  •  ${page.color.frenchName} (${page.color.hex})`,
+        imgX + 20,
+        curY + 2
+      );
+    curY += 24;
+  }
+
+  if (hasSeam) {
+    doc.image(page.standingSeamBuffer!, imgX, curY, {
+      fit: [imgW, imgH],
+      align: "center",
+      valign: "center",
+    });
+    curY += imgH + 4;
+
+    doc.rect(imgX, curY, 14, 14).fill(page.color.hex);
+    doc
+      .fontSize(9)
+      .fillColor("#333333")
+      .font("Helvetica-Bold")
+      .text(
+        `Joint Debout  •  ${page.color.frenchName} (${page.color.hex})`,
+        imgX + 20,
+        curY + 2
+      );
+  }
+
+  drawFooter(doc);
+}
+
+function drawSectionDivider(
+  doc: PDFKit.PDFDocument,
+  logoBuffer: Buffer,
+  title: string,
+  subtitle: string,
+  imageBuffer?: Buffer
+) {
+  doc.addPage();
+  drawBlackHeader(doc, logoBuffer);
+
+  const titleY = HEADER_H + 80;
+
+  doc
+    .fontSize(11)
+    .fillColor(ACCENT)
+    .font("Helvetica-Bold")
+    .text("SECTION", MARGIN, titleY, {
+      align: "center",
+      width: CONTENT_W,
+      characterSpacing: 4,
+    });
+
+  doc
+    .fontSize(36)
+    .fillColor(BLACK)
+    .font("Helvetica-Bold")
+    .text(title, MARGIN, titleY + 24, {
+      align: "center",
+      width: CONTENT_W,
+    });
+
+  doc
+    .moveTo(PAGE_W / 2 - 40, titleY + 78)
+    .lineTo(PAGE_W / 2 + 40, titleY + 78)
+    .strokeColor(ACCENT)
+    .lineWidth(3)
+    .stroke();
+
+  doc
+    .fontSize(13)
+    .fillColor("#333333")
+    .font("Helvetica")
+    .text(subtitle, MARGIN, titleY + 96, {
+      align: "center",
+      width: CONTENT_W,
+    });
+
+  if (imageBuffer) {
+    const photoW = CONTENT_W * 0.7;
+    const photoMaxH = 380;
+    const photoX = (PAGE_W - photoW) / 2;
+    const photoY = titleY + 140;
+    doc.image(imageBuffer, photoX, photoY, {
+      fit: [photoW, photoMaxH],
+      align: "center",
+      valign: "center",
+    });
+  }
+
+  drawFooter(doc);
+}
+
 export async function buildPdf(params: PdfParams): Promise<Buffer> {
-  const { originalImageBuffer, colorPages, logoBuffer, clientName } = params;
+  const {
+    originalImageBuffer,
+    colorPages,
+    backOriginalImageBuffer,
+    backColorPages,
+    logoBuffer,
+    clientName,
+  } = params;
+
+  const hasBack = !!(
+    backOriginalImageBuffer &&
+    backColorPages &&
+    backColorPages.length > 0
+  );
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -79,7 +222,6 @@ export async function buildPdf(params: PdfParams): Promise<Buffer> {
     doc.addPage();
     drawBlackHeader(doc, logoBuffer);
 
-    // Title block — tight spacing
     const titleY = HEADER_H + 20;
     doc
       .fontSize(26)
@@ -96,7 +238,6 @@ export async function buildPdf(params: PdfParams): Promise<Buffer> {
         width: CONTENT_W,
       });
 
-    // Subtitle / Client name
     doc
       .fontSize(14)
       .fillColor(ACCENT)
@@ -110,7 +251,6 @@ export async function buildPdf(params: PdfParams): Promise<Buffer> {
         { align: "center", width: CONTENT_W }
       );
 
-    // Date
     const now = new Date();
     const dateStr = now.toLocaleDateString("fr-CA", {
       year: "numeric",
@@ -125,7 +265,6 @@ export async function buildPdf(params: PdfParams): Promise<Buffer> {
         width: CONTENT_W,
       });
 
-    // Original photo — LARGE (80% width)
     const photoW = CONTENT_W * 0.85;
     const photoMaxH = 420;
     const photoX = (PAGE_W - photoW) / 2;
@@ -137,83 +276,41 @@ export async function buildPdf(params: PdfParams): Promise<Buffer> {
       valign: "center",
     });
 
-    // Label under photo
     doc
       .fontSize(9)
       .fillColor("#999999")
-      .text("Photo originale de votre maison", MARGIN, photoY + photoMaxH + 8, {
-        align: "center",
-        width: CONTENT_W,
-      });
+      .text(
+        hasBack
+          ? "Photo originale — vue avant"
+          : "Photo originale de votre maison",
+        MARGIN,
+        photoY + photoMaxH + 8,
+        { align: "center", width: CONTENT_W }
+      );
 
     drawFooter(doc);
 
-    // ─── PAGES 2-4: COLOR PAGES ───
+    // ─── FRONT COLOR PAGES ───
     for (const page of colorPages) {
-      doc.addPage();
-
-      const colorLabel =
-        page.color.ral !== "N/A"
-          ? `${page.color.frenchName} — ${page.color.ral}`
-          : page.color.frenchName;
-
-      drawBlackHeader(doc, logoBuffer, colorLabel);
-
-      const hasWave = !!page.waveTileBuffer;
-      const hasSeam = !!page.standingSeamBuffer;
-      const hasBoth = hasWave && hasSeam;
-
-      const imgW = CONTENT_W * 0.92;
-      // If only 1 style, use more vertical space
-      const imgH = hasBoth ? 270 : 480;
-      const imgX = (PAGE_W - imgW) / 2;
-      let curY = HEADER_H + 14;
-
-      if (hasWave) {
-        doc.image(page.waveTileBuffer!, imgX, curY, {
-          fit: [imgW, imgH],
-          align: "center",
-          valign: "center",
-        });
-        curY += imgH + 4;
-
-        doc.rect(imgX, curY, 14, 14).fill(page.color.hex);
-        doc
-          .fontSize(9)
-          .fillColor("#333333")
-          .font("Helvetica-Bold")
-          .text(
-            `Tuile Ondulée Européenne  •  ${page.color.frenchName} (${page.color.hex})`,
-            imgX + 20,
-            curY + 2
-          );
-        curY += 24;
-      }
-
-      if (hasSeam) {
-        doc.image(page.standingSeamBuffer!, imgX, curY, {
-          fit: [imgW, imgH],
-          align: "center",
-          valign: "center",
-        });
-        curY += imgH + 4;
-
-        doc.rect(imgX, curY, 14, 14).fill(page.color.hex);
-        doc
-          .fontSize(9)
-          .fillColor("#333333")
-          .font("Helvetica-Bold")
-          .text(
-            `Joint Debout  •  ${page.color.frenchName} (${page.color.hex})`,
-            imgX + 20,
-            curY + 2
-          );
-      }
-
-      drawFooter(doc);
+      drawColorPage(doc, page, logoBuffer, hasBack ? "AVANT" : undefined);
     }
 
-    // ─── PAGE 5: CTA / CONTACT ───
+    // ─── BACK SECTION (if applicable) ───
+    if (hasBack) {
+      drawSectionDivider(
+        doc,
+        logoBuffer,
+        "ARRIÈRE",
+        "Simulations de la vue arrière de votre maison",
+        backOriginalImageBuffer
+      );
+
+      for (const page of backColorPages!) {
+        drawColorPage(doc, page, logoBuffer, "ARRIÈRE");
+      }
+    }
+
+    // ─── FINAL PAGE: CTA / CONTACT ───
     doc.addPage();
     drawBlackHeader(doc, logoBuffer);
 
@@ -231,7 +328,6 @@ export async function buildPdf(params: PdfParams): Promise<Buffer> {
       width: CONTENT_W,
     });
 
-    // Accent line
     doc
       .moveTo(PAGE_W / 2 - 40, ctaY + 80)
       .lineTo(PAGE_W / 2 + 40, ctaY + 80)
@@ -250,7 +346,6 @@ export async function buildPdf(params: PdfParams): Promise<Buffer> {
         { align: "center", width: CONTENT_W }
       );
 
-    // Contact block
     const contactY = ctaY + 170;
     doc
       .fontSize(16)
@@ -273,7 +368,6 @@ export async function buildPdf(params: PdfParams): Promise<Buffer> {
       width: CONTENT_W,
     });
 
-    // Disclaimer
     doc
       .fontSize(7)
       .fillColor("#AAAAAA")

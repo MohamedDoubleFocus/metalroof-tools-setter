@@ -1,7 +1,7 @@
 "use client";
 
 import { COLORS } from "@/lib/colors";
-import type { GenerationTask } from "@/types";
+import type { GenerationTask, Side } from "@/types";
 
 interface Props {
   tasks: GenerationTask[];
@@ -12,18 +12,23 @@ const STYLE_LABELS: Record<string, string> = {
   standing_seam: "Joint Debout",
 };
 
-export default function ResultsGallery({ tasks }: Props) {
-  const successTasks = tasks.filter((t) => t.status === "success");
+function renderSection(
+  side: Side,
+  tasks: GenerationTask[],
+  showSideHeader: boolean
+) {
+  const successTasks = tasks.filter(
+    (t) => t.status === "success" && t.side === side
+  );
 
-  // Group by color
+  if (successTasks.length === 0) return null;
+
   const colorGroups: Record<
     string,
     { waveTile?: GenerationTask; standingSeam?: GenerationTask }
   > = {};
   for (const task of successTasks) {
-    if (!colorGroups[task.colorKey]) {
-      colorGroups[task.colorKey] = {};
-    }
+    if (!colorGroups[task.colorKey]) colorGroups[task.colorKey] = {};
     if (task.roofStyle === "wave_tile") {
       colorGroups[task.colorKey].waveTile = task;
     } else {
@@ -32,15 +37,21 @@ export default function ResultsGallery({ tasks }: Props) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <h2 className="text-xl font-bold text-gray-800 mb-6">
-        Vos simulations de toiture
-      </h2>
+    <div>
+      {showSideHeader && (
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-px bg-gray-300 flex-1" />
+          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">
+            {side === "front" ? "Vue avant" : "Vue arrière"}
+          </h2>
+          <div className="h-px bg-gray-300 flex-1" />
+        </div>
+      )}
 
       {Object.entries(colorGroups).map(([colorKey, group]) => {
         const color = COLORS[colorKey];
         return (
-          <div key={colorKey} className="mb-10">
+          <div key={`${side}-${colorKey}`} className="mb-10">
             <div className="flex items-center gap-3 mb-4">
               <div
                 className="w-6 h-6 rounded-full border border-gray-300"
@@ -91,6 +102,21 @@ export default function ResultsGallery({ tasks }: Props) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+export default function ResultsGallery({ tasks }: Props) {
+  const hasBack = tasks.some((t) => t.side === "back");
+
+  return (
+    <div className="max-w-5xl mx-auto">
+      <h2 className="text-xl font-bold text-gray-800 mb-6">
+        Vos simulations de toiture
+      </h2>
+
+      {renderSection("front", tasks, hasBack)}
+      {hasBack && renderSection("back", tasks, true)}
     </div>
   );
 }

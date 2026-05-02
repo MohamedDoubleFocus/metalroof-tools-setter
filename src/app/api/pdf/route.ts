@@ -14,44 +14,115 @@ interface ColorResult {
 
 export async function POST(request: NextRequest) {
   try {
-    const { originalImageUrl, results, clientName } = (await request.json()) as {
+    const {
+      originalImageUrl,
+      results,
+      backOriginalImageUrl,
+      backResults,
+      clientName,
+    } = (await request.json()) as {
       originalImageUrl: string;
       results: ColorResult[];
+      backOriginalImageUrl?: string | null;
+      backResults?: ColorResult[];
       clientName?: string;
     };
 
-    if (!originalImageUrl || !results || results.length === 0) {
+    if (!originalImageUrl || !results) {
       return NextResponse.json(
         { error: "Paramètres invalides" },
         { status: 400 }
       );
     }
 
-    // Collect all image URLs to download
-    const imageUrls: string[] = [];
-    for (const r of results) {
-      if (r.waveTileUrl) imageUrls.push(r.waveTileUrl);
-      if (r.standingSeamUrl) imageUrls.push(r.standingSeamUrl);
+    const hasBack = !!(
+      backOriginalImageUrl &&
+      backResults &&
+      backResults.length > 0
+    );
+
+    if (results.length === 0 && !hasBack) {
+      return NextResponse.json(
+        { error: "Aucune image à inclure dans le PDF" },
+        { status: 400 }
+      );
     }
 
-    const [logoBuffer, originalImageBuffer, ...imageBuffers] =
-      await Promise.all([
-        getLogoPngBuffer(),
-        downloadImageAsBuffer(originalImageUrl),
-        ...imageUrls.map((url) => downloadImageAsBuffer(url)),
-      ]);
+    // Collect all image URLs to download (front + back)
+    const frontImageUrls: string[] = [];
+    for (const r of results) {
+      if (r.waveTileUrl) frontImageUrls.push(r.waveTileUrl);
+      if (r.standingSeamUrl) frontImageUrls.push(r.standingSeamUrl);
+    }
 
-    // Map buffers back to color pages
-    let bufIdx = 0;
+    const backImageUrls: string[] = [];
+    if (hasBack) {
+      for (const r of backResults!) {
+        if (r.waveTileUrl) backImageUrls.push(r.waveTileUrl);
+        if (r.standingSeamUrl) backImageUrls.push(r.standingSeamUrl);
+      }
+    }
+
+    const downloadPromises: Promise<Buffer>[] = [
+      getLogoPngBuffer(),
+      downloadImageAsBuffer(originalImageUrl),
+      ...frontImageUrls.map((url) => downloadImageAsBuffer(url)),
+    ];
+    if (hasBack && backOriginalImageUrl) {
+      downloadPromises.push(downloadImageAsBuffer(backOriginalImageUrl));
+      downloadPromises.push(
+        ...backImageUrls.map((url) => downloadImageAsBuffer(url))
+      );
+    }
+
+    const downloaded = await Promise.all(downloadPromises);
+
+    let idx = 0;
+    const logoBuffer = downloaded[idx++];
+    const originalImageBuffer = downloaded[idx++];
+
+    const frontImageBuffers: Buffer[] = [];
+    for (let i = 0; i < frontImageUrls.length; i++) {
+      frontImageBuffers.push(downloaded[idx++]);
+    }
+
+    let backOriginalImageBuffer: Buffer | undefined;
+    const backImageBuffers: Buffer[] = [];
+    if (hasBack) {
+      backOriginalImageBuffer = downloaded[idx++];
+      for (let i = 0; i < backImageUrls.length; i++) {
+        backImageBuffers.push(downloaded[idx++]);
+      }
+    }
+
+    // Map front buffers back to color pages
+    let frontBufIdx = 0;
     const colorPages = results.map((r) => ({
       color: COLORS[r.colorKey],
-      waveTileBuffer: r.waveTileUrl ? imageBuffers[bufIdx++] : undefined,
-      standingSeamBuffer: r.standingSeamUrl ? imageBuffers[bufIdx++] : undefined,
+      waveTileBuffer: r.waveTileUrl ? frontImageBuffers[frontBufIdx++] : undefined,
+      standingSeamBuffer: r.standingSeamUrl
+        ? frontImageBuffers[frontBufIdx++]
+        : undefined,
     }));
+
+    // Map back buffers back to color pages
+    let backColorPages;
+    if (hasBack) {
+      let backBufIdx = 0;
+      backColorPages = backResults!.map((r) => ({
+        color: COLORS[r.colorKey],
+        waveTileBuffer: r.waveTileUrl ? backImageBuffers[backBufIdx++] : undefined,
+        standingSeamBuffer: r.standingSeamUrl
+          ? backImageBuffers[backBufIdx++]
+          : undefined,
+      }));
+    }
 
     const pdfBuffer = await buildPdf({
       originalImageBuffer,
       colorPages,
+      backOriginalImageBuffer,
+      backColorPages,
       logoBuffer,
       clientName,
     });

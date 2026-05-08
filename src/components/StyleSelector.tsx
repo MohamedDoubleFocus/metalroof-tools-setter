@@ -24,7 +24,7 @@ const STYLES: { key: RoofStyle; label: string; description: string }[] = [
     key: "shingle_tile",
     label: "Tuile Écaille Européenne",
     description:
-      "Bardeaux métalliques estampés en écailles arrondies, rangées décalées, fini mat",
+      "Tuiles métalliques estampées à bord arrondi, légèrement bombées, rangées décalées, fini mat",
   },
 ];
 

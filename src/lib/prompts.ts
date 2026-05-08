@@ -73,7 +73,19 @@ export function getShingleTilePrompt(color: ColorDefinition, customInstructions?
 
 Cover 100% of the original roof surface. Match the exact roof boundaries at pixel level. If the original has multiple roof sections, keep every single one — do not merge, split, add, or omit any section.
 
-Apply a European stamped metal shingle tile roof (scalloped fish-scale style). The material is steel pressed into flat panels with an embossed scalloped tile pattern: each individual tile unit is roughly rectangular with a softly rounded, half-circle bottom edge, giving a classic European fish-scale or beaver-tail appearance. The tiles are arranged in horizontal rows that run parallel to the eave, and each row is offset by half a tile width from the row above (staggered brick / running-bond pattern), so the rounded bottoms of one row sit between the rounded bottoms of the row above. The tiles are flat (not deeply waved) — the relief is shallow embossing with subtle shadow lines between each tile and between each row. The finish is a low-sheen matte to semi-matte metallic baked enamel, smooth and uniform, with light realistic reflections only where the sun hits. Tile dimensions should look proportionate to the roof — moderate, residential scale (not oversized). ${colorLine}
+Apply a traditional European Mediterranean-style stamped metal scalloped tile roof — the classic "tuile écaille" / French-Spanish-Italian fish-scale / beaver-tail tile look from villas in Provence, Tuscany, and rural Spain, executed in pressed steel panels (similar to Permanent Roof, Roser, or Tilcor stamped metal tile systems). The roof is made of long horizontal pressed-steel panels stamped with multiple individual tile units per panel — but the final visual must read as discrete tiles, not as panels.
+
+KEY VISUAL DETAILS — critical for matching the reference style:
+
+- TILE SHAPE: Each individual tile is roughly square-to-slightly-rectangular, with a softly rounded HALF-CIRCLE SCALLOPED BOTTOM EDGE (fish-scale / beaver-tail silhouette), and a clearly visible CONVEX 3D DOME across the tile face — moderate doming, more than a subtle pillow but less than a deep barrel ridge. Each tile catches light on its convex top and shows a gentle shaded valley near its sides.
+
+- DEEP CRISP SHADOW GROOVES — most important: there must be PRONOUNCED, SHARP, DARK SHADOW LINES around every tile. Strong vertical dark grooves separate adjacent tiles within a row. Strong horizontal dark shadow lines run where each row's tiles meet the row below — caused by a real, visible OVERLAPPING LIP at the bottom of each tile that physically protrudes outward and casts a crisp, dark, sharp horizontal shadow line on the row below. These shadow lines are deep and well-defined (not soft or subtle) — they are what gives the roof its characteristic crisp, three-dimensional, hand-laid clay-tile appearance. The shadow grooves should read as nearly black against the tile color.
+
+- ROW PATTERN: Tiles are arranged in horizontal rows parallel to the eave, with rows STAGGERED / OFFSET BY HALF A TILE (brick / running-bond pattern) so the rounded bottom of each tile sits centered between the rounded bottoms of the two tiles in the row above. This creates the characteristic wavy scalloped horizontal banding when viewed from a distance.
+
+- FINISH: low-sheen MATTE to semi-matte metallic baked enamel — uniform, with very slight textured/granular surface (like fine matte powder coat), and realistic specular highlights only where direct sun catches the gentle curvature of each dome. Never glossy, never plasticky, never reflective like sheet metal.
+
+- SCALE: moderate residential tile scale — the size of traditional European clay tiles, not oversized industrial panels. ${colorLine}
 
 CRITICAL COLOR LOCK — The NEW roof color applies EXCLUSIVELY to the roof slopes/panels. It must NEVER bleed onto any other element.
 

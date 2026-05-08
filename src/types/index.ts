@@ -6,7 +6,7 @@ export interface ColorDefinition {
   description?: string;
 }
 
-export type RoofStyle = "wave_tile" | "standing_seam";
+export type RoofStyle = "wave_tile" | "standing_seam" | "shingle_tile";
 
 export type TaskType = "enhancement" | "roof";
 

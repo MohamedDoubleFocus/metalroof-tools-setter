@@ -4,6 +4,7 @@ import {
   getEnhancementPrompt,
   getWaveTilePrompt,
   getStandingSeamPrompt,
+  getShingleTilePrompt,
 } from "@/lib/prompts";
 import { createTask, pollTaskResult } from "@/lib/kie-ai";
 import type { RoofStyle } from "@/types";
@@ -21,7 +22,7 @@ interface RoofTaskDef {
 export async function POST(request: NextRequest) {
   const { imageUrl, colors, styles } = await request.json();
 
-  const validStyles: RoofStyle[] = ["wave_tile", "standing_seam"];
+  const validStyles: RoofStyle[] = ["wave_tile", "standing_seam", "shingle_tile"];
   const selectedStyles: RoofStyle[] = (styles || validStyles).filter(
     (s: string) => validStyles.includes(s as RoofStyle)
   );
@@ -61,6 +62,14 @@ export async function POST(request: NextRequest) {
         colorKey,
         roofStyle: "standing_seam",
         prompt: getStandingSeamPrompt(color),
+      });
+    }
+    if (selectedStyles.includes("shingle_tile")) {
+      roofTasks.push({
+        index: idx++,
+        colorKey,
+        roofStyle: "shingle_tile",
+        prompt: getShingleTilePrompt(color),
       });
     }
   }

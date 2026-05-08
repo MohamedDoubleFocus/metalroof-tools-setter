@@ -683,7 +683,11 @@ export default function RoofSimulator() {
       const buildSideResults = (side: "front" | "back") => {
         const colorResults: Record<
           string,
-          { waveTileUrl?: string; standingSeamUrl?: string }
+          {
+            waveTileUrl?: string;
+            standingSeamUrl?: string;
+            shingleTileUrl?: string;
+          }
         > = {};
         for (const task of state.tasks) {
           if (
@@ -696,16 +700,21 @@ export default function RoofSimulator() {
           if (!colorResults[task.colorKey]) colorResults[task.colorKey] = {};
           if (task.roofStyle === "wave_tile") {
             colorResults[task.colorKey].waveTileUrl = task.resultUrl;
-          } else {
+          } else if (task.roofStyle === "standing_seam") {
             colorResults[task.colorKey].standingSeamUrl = task.resultUrl;
+          } else {
+            colorResults[task.colorKey].shingleTileUrl = task.resultUrl;
           }
         }
         return Object.entries(colorResults)
-          .filter(([, v]) => v.waveTileUrl || v.standingSeamUrl)
+          .filter(
+            ([, v]) => v.waveTileUrl || v.standingSeamUrl || v.shingleTileUrl
+          )
           .map(([colorKey, v]) => ({
             colorKey,
             waveTileUrl: v.waveTileUrl,
             standingSeamUrl: v.standingSeamUrl,
+            shingleTileUrl: v.shingleTileUrl,
           }));
       };
 
@@ -1126,7 +1135,11 @@ export default function RoofSimulator() {
           );
           const firstColorKey = frontFirst?.colorKey;
           const styleLabel =
-            frontFirst?.roofStyle === "wave_tile" ? "Tuile Onde" : "Joint Debout";
+            frontFirst?.roofStyle === "wave_tile"
+              ? "Tuile Onde"
+              : frontFirst?.roofStyle === "standing_seam"
+                ? "Joint Debout"
+                : "Tuile Ecaille";
           const allFailed =
             frontFirst?.status === "error" &&
             (state.hasBackPhoto ? backFirst?.status === "error" : true);

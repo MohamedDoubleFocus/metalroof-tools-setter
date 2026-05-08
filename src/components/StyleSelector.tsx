@@ -20,6 +20,12 @@ const STYLES: { key: RoofStyle; label: string; description: string }[] = [
     description:
       "Panneaux d'acier lisses avec joints verticaux espacés de 14 pouces",
   },
+  {
+    key: "shingle_tile",
+    label: "Tuile Écaille Européenne",
+    description:
+      "Bardeaux métalliques estampés en écailles arrondies, rangées décalées, fini mat",
+  },
 ];
 
 export default function StyleSelector({ selectedStyles, onToggle }: Props) {

@@ -4,6 +4,7 @@ import {
   getEnhancementPrompt,
   getWaveTilePrompt,
   getStandingSeamPrompt,
+  getShingleTilePrompt,
 } from "@/lib/prompts";
 import { createTask } from "@/lib/kie-ai";
 import type { RoofStyle } from "@/types";
@@ -34,10 +35,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Parametres invalides" }, { status: 400 });
       }
       const color = COLORS[colorKey];
-      prompt =
-        roofStyle === "wave_tile"
-          ? getWaveTilePrompt(color, customInstructions)
-          : getStandingSeamPrompt(color, customInstructions);
+      if (roofStyle === "wave_tile") {
+        prompt = getWaveTilePrompt(color, customInstructions);
+      } else if (roofStyle === "standing_seam") {
+        prompt = getStandingSeamPrompt(color, customInstructions);
+      } else {
+        prompt = getShingleTilePrompt(color, customInstructions);
+      }
     }
 
     // Only create the task, return taskId immediately

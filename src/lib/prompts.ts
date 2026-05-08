@@ -65,6 +65,36 @@ Keep the full house structure unchanged. Keep the roof geometry, shape, pitch, a
 The result must be photorealistic. The original roof boundaries must remain locked. The image passes validation only if the roof area is identical to the original, gutters and soffits have the exact same color as the input (unless explicitly overridden by the custom instructions above), and absolutely nothing else has changed.`;
 }
 
+export function getShingleTilePrompt(color: ColorDefinition, customInstructions?: string): string {
+  const colorLine = getColorLine(color);
+  const customBlock = getCustomInstructionsBlock(customInstructions);
+
+  return `Replace ONLY the main roof covering material on this house. The output roof area must equal the input roof area exactly — no more, no less.
+
+Cover 100% of the original roof surface. Match the exact roof boundaries at pixel level. If the original has multiple roof sections, keep every single one — do not merge, split, add, or omit any section.
+
+Apply a European stamped metal shingle tile roof (scalloped fish-scale style). The material is steel pressed into flat panels with an embossed scalloped tile pattern: each individual tile unit is roughly rectangular with a softly rounded, half-circle bottom edge, giving a classic European fish-scale or beaver-tail appearance. The tiles are arranged in horizontal rows that run parallel to the eave, and each row is offset by half a tile width from the row above (staggered brick / running-bond pattern), so the rounded bottoms of one row sit between the rounded bottoms of the row above. The tiles are flat (not deeply waved) — the relief is shallow embossing with subtle shadow lines between each tile and between each row. The finish is a low-sheen matte to semi-matte metallic baked enamel, smooth and uniform, with light realistic reflections only where the sun hits. Tile dimensions should look proportionate to the roof — moderate, residential scale (not oversized). ${colorLine}
+
+CRITICAL COLOR LOCK — The NEW roof color applies EXCLUSIVELY to the roof slopes/panels. It must NEVER bleed onto any other element.
+
+The following elements MUST keep their ORIGINAL color, material, texture, and finish from the input photo — pixel identical, unchanged:
+- Gutters (eavestroughs) — keep the exact original color they have in the input photo, do not tint, do not recolor, do not match to the new roof color
+- Soffits (under-eave panels) — keep the exact original color they have in the input photo, do not tint, do not recolor, do not match to the new roof color
+- Fascia boards and trim — keep original color unchanged
+- Walls, siding, brick, stone, facades — keep original color unchanged
+- Windows, doors, garage doors, shutters — keep original color unchanged
+- Porches, decks, railings, columns, awnings, carports — keep original color unchanged
+- Any secondary small roofs over porches or bay windows if they are not the main roof — keep original unchanged
+
+Do NOT propagate, reflect, echo, or coordinate the new roof color onto gutters or soffits. Gutters and soffits are OFF-LIMITS — treat them as a protected mask.
+
+Do not add roofing material to any surface that is not already a roof. Do not extend the roof beyond its original edges.
+
+Keep the full house structure unchanged. Keep the roof geometry, shape, pitch, angles, ridges, hips, valleys, and overhangs identical. Keep the environment, vegetation, sky, lighting, shadows, and season exactly as they are in the original photo.${customBlock}
+
+The result must be photorealistic. The original roof boundaries must remain locked. The image passes validation only if the roof area is identical to the original, gutters and soffits have the exact same color as the input (unless explicitly overridden by the custom instructions above), and absolutely nothing else has changed.`;
+}
+
 export function getStandingSeamPrompt(color: ColorDefinition, customInstructions?: string): string {
   const colorLine = getColorLine(color);
   const customBlock = getCustomInstructionsBlock(customInstructions);

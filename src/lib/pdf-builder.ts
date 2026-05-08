@@ -13,6 +13,7 @@ interface ColorPage {
   color: ColorDefinition;
   waveTileBuffer?: Buffer;
   standingSeamBuffer?: Buffer;
+  shingleTileBuffer?: Buffer;
 }
 
 interface PdfParams {
@@ -77,15 +78,17 @@ function drawColorPage(
 
   const hasWave = !!page.waveTileBuffer;
   const hasSeam = !!page.standingSeamBuffer;
-  const hasBoth = hasWave && hasSeam;
+  const hasShingle = !!page.shingleTileBuffer;
+  const styleCount =
+    (hasWave ? 1 : 0) + (hasSeam ? 1 : 0) + (hasShingle ? 1 : 0);
 
   const imgW = CONTENT_W * 0.92;
-  const imgH = hasBoth ? 270 : 480;
+  const imgH = styleCount >= 3 ? 195 : styleCount === 2 ? 270 : 480;
   const imgX = (PAGE_W - imgW) / 2;
   let curY = HEADER_H + 14;
 
-  if (hasWave) {
-    doc.image(page.waveTileBuffer!, imgX, curY, {
+  const drawStyle = (buffer: Buffer, label: string) => {
+    doc.image(buffer, imgX, curY, {
       fit: [imgW, imgH],
       align: "center",
       valign: "center",
@@ -98,32 +101,16 @@ function drawColorPage(
       .fillColor("#333333")
       .font("Helvetica-Bold")
       .text(
-        `Tuile Ondulée Européenne  •  ${page.color.frenchName} (${page.color.hex})`,
+        `${label}  •  ${page.color.frenchName} (${page.color.hex})`,
         imgX + 20,
         curY + 2
       );
     curY += 24;
-  }
+  };
 
-  if (hasSeam) {
-    doc.image(page.standingSeamBuffer!, imgX, curY, {
-      fit: [imgW, imgH],
-      align: "center",
-      valign: "center",
-    });
-    curY += imgH + 4;
-
-    doc.rect(imgX, curY, 14, 14).fill(page.color.hex);
-    doc
-      .fontSize(9)
-      .fillColor("#333333")
-      .font("Helvetica-Bold")
-      .text(
-        `Joint Debout  •  ${page.color.frenchName} (${page.color.hex})`,
-        imgX + 20,
-        curY + 2
-      );
-  }
+  if (hasWave) drawStyle(page.waveTileBuffer!, "Tuile Ondulée Européenne");
+  if (hasSeam) drawStyle(page.standingSeamBuffer!, "Joint Debout");
+  if (hasShingle) drawStyle(page.shingleTileBuffer!, "Tuile Écaille Européenne");
 
   drawFooter(doc);
 }

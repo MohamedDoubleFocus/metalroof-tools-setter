@@ -10,6 +10,7 @@ interface ColorResult {
   colorKey: string;
   waveTileUrl?: string;
   standingSeamUrl?: string;
+  shingleTileUrl?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
     for (const r of results) {
       if (r.waveTileUrl) frontImageUrls.push(r.waveTileUrl);
       if (r.standingSeamUrl) frontImageUrls.push(r.standingSeamUrl);
+      if (r.shingleTileUrl) frontImageUrls.push(r.shingleTileUrl);
     }
 
     const backImageUrls: string[] = [];
@@ -60,6 +62,7 @@ export async function POST(request: NextRequest) {
       for (const r of backResults!) {
         if (r.waveTileUrl) backImageUrls.push(r.waveTileUrl);
         if (r.standingSeamUrl) backImageUrls.push(r.standingSeamUrl);
+        if (r.shingleTileUrl) backImageUrls.push(r.shingleTileUrl);
       }
     }
 
@@ -103,6 +106,9 @@ export async function POST(request: NextRequest) {
       standingSeamBuffer: r.standingSeamUrl
         ? frontImageBuffers[frontBufIdx++]
         : undefined,
+      shingleTileBuffer: r.shingleTileUrl
+        ? frontImageBuffers[frontBufIdx++]
+        : undefined,
     }));
 
     // Map back buffers back to color pages
@@ -113,6 +119,9 @@ export async function POST(request: NextRequest) {
         color: COLORS[r.colorKey],
         waveTileBuffer: r.waveTileUrl ? backImageBuffers[backBufIdx++] : undefined,
         standingSeamBuffer: r.standingSeamUrl
+          ? backImageBuffers[backBufIdx++]
+          : undefined,
+        shingleTileBuffer: r.shingleTileUrl
           ? backImageBuffers[backBufIdx++]
           : undefined,
       }));

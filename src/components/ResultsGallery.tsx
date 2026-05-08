@@ -10,6 +10,7 @@ interface Props {
 const STYLE_LABELS: Record<string, string> = {
   wave_tile: "Tuile Ondulée Européenne",
   standing_seam: "Joint Debout",
+  shingle_tile: "Tuile Écaille Européenne",
 };
 
 function renderSection(
@@ -25,14 +26,20 @@ function renderSection(
 
   const colorGroups: Record<
     string,
-    { waveTile?: GenerationTask; standingSeam?: GenerationTask }
+    {
+      waveTile?: GenerationTask;
+      standingSeam?: GenerationTask;
+      shingleTile?: GenerationTask;
+    }
   > = {};
   for (const task of successTasks) {
     if (!colorGroups[task.colorKey]) colorGroups[task.colorKey] = {};
     if (task.roofStyle === "wave_tile") {
       colorGroups[task.colorKey].waveTile = task;
-    } else {
+    } else if (task.roofStyle === "standing_seam") {
       colorGroups[task.colorKey].standingSeam = task;
+    } else {
+      colorGroups[task.colorKey].shingleTile = task;
     }
   }
 
@@ -94,6 +101,21 @@ function renderSection(
                   <div className="p-3 bg-white text-center">
                     <p className="text-sm font-semibold text-gray-700">
                       {STYLE_LABELS.standing_seam}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {group.shingleTile?.resultUrl && (
+                <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={group.shingleTile.resultUrl}
+                    alt={`${color?.frenchName} - Tuile Écaille`}
+                    className="w-full h-auto"
+                  />
+                  <div className="p-3 bg-white text-center">
+                    <p className="text-sm font-semibold text-gray-700">
+                      {STYLE_LABELS.shingle_tile}
                     </p>
                   </div>
                 </div>

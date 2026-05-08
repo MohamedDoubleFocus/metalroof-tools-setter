@@ -12,6 +12,12 @@ const NAV_ITEMS = [
 export default function NavHeader() {
   const pathname = usePathname();
 
+  // Hide the internal navigation on the client-facing portal — clients should
+  // never see links to the booking tool, internal simulator, or homepage.
+  if (pathname.startsWith("/client")) {
+    return null;
+  }
+
   return (
     <nav className="bg-black text-white">
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14">

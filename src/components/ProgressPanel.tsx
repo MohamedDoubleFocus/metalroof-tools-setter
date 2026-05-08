@@ -10,6 +10,7 @@ interface Props {
 const STYLE_LABELS: Record<string, string> = {
   wave_tile: "Tuile Ondulée",
   standing_seam: "Joint Debout",
+  shingle_tile: "Tuile Écaille",
 };
 
 function StatusIcon({ status }: { status: string }) {

@@ -10,8 +10,13 @@ interface SequencePoint {
   startTime: Date; // when the next thing at this point begins
 }
 
-/** Step (in minutes) used to scan candidate start-times within a gap */
-const SLOT_STEP_MINUTES = 30;
+/**
+ * Step (in minutes) used to scan candidate start-times within a gap.
+ * 15 min strikes a balance: clean clock times (8h00, 8h15, 8h30, 8h45)
+ * AND tight gaps still fit (a 19-min window aligned with quarters keeps a slot,
+ * a 30-min step would lose it).
+ */
+const SLOT_STEP_MINUTES = 15;
 
 /** Maximum number of slots returned per day (diversity across times of day) */
 const MAX_SLOTS_PER_DAY = 5;

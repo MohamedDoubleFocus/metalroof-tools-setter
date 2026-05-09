@@ -28,6 +28,10 @@ export interface SlotSuggestion {
   score: number; // lower = better
   travelFromPrevious: number; // minutes
   travelToNext: number; // minutes
+  /** True when the "previous point" is the home base (start of day) instead of an MT event */
+  previousIsHome: boolean;
+  /** True when the "next point" is the home base (end of day) instead of an MT event */
+  nextIsHome: boolean;
   conflict: boolean; // true if addedTravel > maxAcceptable
   dayEventCount: number; // how many MT events that day
 }

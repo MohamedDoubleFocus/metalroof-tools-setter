@@ -42,9 +42,19 @@ export default function SlotSuggestionCard({ suggestion, rank }: Props) {
       <div className="text-lg font-bold text-gray-900 mb-2">
         {formatTime(start)} - {formatTime(end)}
       </div>
-      <div className="flex gap-4 text-sm text-gray-500">
-        <span>{suggestion.travelFromPrevious} min depuis precedent</span>
-        <span>{suggestion.travelToNext} min vers suivant</span>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
+        <span>
+          {suggestion.travelFromPrevious} min depuis{" "}
+          <span className="font-semibold text-gray-700">
+            {suggestion.previousIsHome ? "🏠 Maison" : "RDV précédent"}
+          </span>
+        </span>
+        <span>
+          {suggestion.travelToNext} min vers{" "}
+          <span className="font-semibold text-gray-700">
+            {suggestion.nextIsHome ? "🏠 Maison" : "RDV suivant"}
+          </span>
+        </span>
         <span>{suggestion.dayEventCount} RDV ce jour</span>
       </div>
       {suggestion.conflict && (

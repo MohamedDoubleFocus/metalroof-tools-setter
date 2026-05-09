@@ -177,6 +177,8 @@ export async function findOptimalSlots(
         score: Math.round(addedTravel),
         travelFromPrevious: travelFromPrev.durationMinutes,
         travelToNext: travelToNext.durationMinutes,
+        previousIsHome: prev.id === null,
+        nextIsHome: next.id === null,
         conflict: addedTravel > settings.maxAcceptableTravelMinutes,
         dayEventCount: events.length,
       });

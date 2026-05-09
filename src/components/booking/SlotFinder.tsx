@@ -1,16 +1,85 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import SlotSuggestionCard from "./SlotSuggestionCard";
 import { SlotSuggestion } from "@/types/booking";
 import { getSettings } from "@/lib/booking/settings";
 
 export default function SlotFinder() {
   const [address, setAddress] = useState("");
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    null
+  );
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<SlotSuggestion[]>([]);
   const [daysScanned, setDaysScanned] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const apiInitialized = useRef(false);
+
+  // Wire up Google Places Autocomplete to the address input
+  useEffect(() => {
+    if (!inputRef.current) return;
+
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      // Autocomplete will simply not load; the field still works as plain text input.
+      return;
+    }
+
+    let cancelled = false;
+    let listener: google.maps.MapsEventListener | null = null;
+
+    async function init() {
+      try {
+        if (!apiInitialized.current) {
+          setOptions({ key: apiKey! });
+          apiInitialized.current = true;
+        }
+        const { Autocomplete } = (await importLibrary(
+          "places"
+        )) as google.maps.PlacesLibrary;
+        if (cancelled || !inputRef.current) return;
+
+        const ac = new Autocomplete(inputRef.current, {
+          componentRestrictions: { country: "ca" },
+          fields: ["formatted_address", "geometry"],
+          types: ["address"],
+        });
+
+        listener = ac.addListener("place_changed", () => {
+          const place = ac.getPlace();
+          if (place.geometry?.location) {
+            setCoords({
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+            });
+          }
+          if (place.formatted_address) {
+            setAddress(place.formatted_address);
+          }
+        });
+      } catch {
+        // silent — fall back to plain input
+      }
+    }
+
+    init();
+
+    return () => {
+      cancelled = true;
+      listener?.remove();
+    };
+  }, []);
+
+  // If the user types after picking a place, invalidate the cached coords
+  // so we don't book against the wrong address.
+  const handleManualChange = (val: string) => {
+    setAddress(val);
+    setCoords(null);
+  };
 
   const handleSearch = async () => {
     if (!address.trim()) return;
@@ -24,7 +93,11 @@ export default function SlotFinder() {
       const res = await fetch("/api/booking/slots", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, settings }),
+        body: JSON.stringify({
+          address,
+          coords: coords ?? undefined,
+          settings,
+        }),
       });
 
       const data = await res.json();
@@ -43,12 +116,14 @@ export default function SlotFinder() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-3">
         <input
+          ref={inputRef}
           type="text"
           value={address}
-          onChange={(e) => setAddress(e.target.value)}
+          onChange={(e) => handleManualChange(e.target.value)}
           placeholder="Adresse du nouveau client..."
           className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+          autoComplete="off"
         />
         <button
           onClick={handleSearch}
@@ -58,6 +133,12 @@ export default function SlotFinder() {
           {loading ? "Analyse en cours..." : "Chercher"}
         </button>
       </div>
+
+      {coords && (
+        <p className="text-xs text-gray-400 -mt-3">
+          Adresse localisée : {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+        </p>
+      )}
 
       {loading && (
         <div className="text-center py-8">

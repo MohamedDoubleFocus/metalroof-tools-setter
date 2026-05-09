@@ -1,11 +1,14 @@
 import { CalendarEvent } from "@/types/booking";
+import { buildMontrealDate, addDays } from "./timezone";
+import { getCachedGeocode, setCachedGeocode } from "./cache";
 
 export async function getCalendarEvents(
   accessToken: string,
-  date: string // YYYY-MM-DD
+  date: string // YYYY-MM-DD (interpreted in Montreal TZ)
 ): Promise<CalendarEvent[]> {
-  const timeMin = new Date(`${date}T00:00:00`).toISOString();
-  const timeMax = new Date(`${date}T23:59:59`).toISOString();
+  // Window covers the entire Montreal calendar day (handles DST automatically)
+  const timeMin = buildMontrealDate(date, "00:00").toISOString();
+  const timeMax = buildMontrealDate(addDays(date, 1), "00:00").toISOString();
 
   const url = new URL(
     "https://www.googleapis.com/calendar/v3/calendars/primary/events"
@@ -56,13 +59,19 @@ export async function getCalendarEvents(
 export async function geocodeAddress(
   address: string
 ): Promise<{ lat: number; lng: number } | null> {
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
+  // L2 cache lookup (persists across requests)
+  const cached = await getCachedGeocode(address);
+  if (cached) return cached;
+
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&region=ca&key=${process.env.GOOGLE_MAPS_API_KEY}`;
   const res = await fetch(url);
   const data = await res.json();
 
   if (data.status === "OK" && data.results?.[0]) {
     const loc = data.results[0].geometry.location;
-    return { lat: loc.lat, lng: loc.lng };
+    const coords = { lat: loc.lat, lng: loc.lng };
+    setCachedGeocode(address, coords).catch(() => {});
+    return coords;
   }
   return null;
 }

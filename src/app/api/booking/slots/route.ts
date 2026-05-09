@@ -17,8 +17,6 @@ import { todayMontrealYmd, addDays, buildMontrealDate } from "@/lib/booking/time
 
 const DAYS_TO_SCAN = 15;
 const PARALLEL_DAY_LIMIT = 5; // run up to 5 days concurrently
-const FINAL_TOP_N = 15;
-const MAX_SLOTS_PER_DAY_GLOBAL = 3; // diversity cap when assembling final list
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -106,28 +104,13 @@ export async function POST(request: NextRequest) {
       )
     );
 
-    // Diversity-aware merge: keep up to MAX_SLOTS_PER_DAY_GLOBAL per day
-    // in the final FINAL_TOP_N list, sorted by score.
-    const allSorted = perDayResults
-      .flat()
-      .sort((a, b) => a.score - b.score);
-
-    const perDayCount = new Map<string, number>();
-    const finalList: SlotSuggestion[] = [];
-    for (const slot of allSorted) {
-      const c = perDayCount.get(slot.date) ?? 0;
-      if (c >= MAX_SLOTS_PER_DAY_GLOBAL) continue;
-      finalList.push(slot);
-      perDayCount.set(slot.date, c + 1);
-      if (finalList.length >= FINAL_TOP_N) break;
-    }
-
-    // finalList is already in score order from the diversity merge above.
-    // Score-first ordering keeps the "rank" label in the UI meaningful:
-    // #1 = least added travel, regardless of date.
+    // Return the full pool of valid slots (already capped at 5/day in the optimizer).
+    // The client picks the sort mode + display cap, so toggling between
+    // "by distance" and "ASAP" doesn't require a second API call.
+    const allSlots: SlotSuggestion[] = perDayResults.flat();
 
     return NextResponse.json({
-      suggestions: finalList,
+      suggestions: allSlots,
       newAddressCoords: coords,
       daysScanned: DAYS_TO_SCAN,
     });

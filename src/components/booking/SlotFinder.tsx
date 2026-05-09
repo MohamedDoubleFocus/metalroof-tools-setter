@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import SlotSuggestionCard from "./SlotSuggestionCard";
 import { SlotSuggestion } from "@/types/booking";
 import { getSettings } from "@/lib/booking/settings";
+
+type SortMode = "distance" | "asap";
+
+const DISPLAY_LIMIT = 15;
+const DISTANCE_MAX_PER_DAY = 3; // diversity cap when sorting by distance
 
 export default function SlotFinder() {
   const [address, setAddress] = useState("");
@@ -12,9 +17,10 @@ export default function SlotFinder() {
     null
   );
   const [loading, setLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<SlotSuggestion[]>([]);
+  const [allSlots, setAllSlots] = useState<SlotSuggestion[]>([]);
   const [daysScanned, setDaysScanned] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("distance");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const apiInitialized = useRef(false);
@@ -24,10 +30,7 @@ export default function SlotFinder() {
     if (!inputRef.current) return;
 
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) {
-      // Autocomplete will simply not load; the field still works as plain text input.
-      return;
-    }
+    if (!apiKey) return;
 
     let cancelled = false;
     let listener: google.maps.MapsEventListener | null = null;
@@ -74,8 +77,6 @@ export default function SlotFinder() {
     };
   }, []);
 
-  // If the user types after picking a place, invalidate the cached coords
-  // so we don't book against the wrong address.
   const handleManualChange = (val: string) => {
     setAddress(val);
     setCoords(null);
@@ -85,7 +86,7 @@ export default function SlotFinder() {
     if (!address.trim()) return;
     setLoading(true);
     setError(null);
-    setSuggestions([]);
+    setAllSlots([]);
     setDaysScanned(null);
 
     try {
@@ -103,7 +104,7 @@ export default function SlotFinder() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur");
 
-      setSuggestions(data.suggestions);
+      setAllSlots(data.suggestions);
       setDaysScanned(data.daysScanned);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
@@ -111,6 +112,35 @@ export default function SlotFinder() {
       setLoading(false);
     }
   };
+
+  // Compute display list based on sort mode
+  const displayedSlots = useMemo(() => {
+    if (allSlots.length === 0) return [];
+
+    if (sortMode === "asap") {
+      // Earliest first, no per-day cap — setter wants "next available"
+      return [...allSlots]
+        .sort(
+          (a, b) =>
+            new Date(a.startTime).getTime() -
+            new Date(b.startTime).getTime()
+        )
+        .slice(0, DISPLAY_LIMIT);
+    }
+
+    // sortMode === "distance" — best score first, max 3/day for diversity
+    const sorted = [...allSlots].sort((a, b) => a.score - b.score);
+    const perDayCount = new Map<string, number>();
+    const out: SlotSuggestion[] = [];
+    for (const slot of sorted) {
+      const c = perDayCount.get(slot.date) ?? 0;
+      if (c >= DISTANCE_MAX_PER_DAY) continue;
+      out.push(slot);
+      perDayCount.set(slot.date, c + 1);
+      if (out.length >= DISPLAY_LIMIT) break;
+    }
+    return out;
+  }, [allSlots, sortMode]);
 
   return (
     <div className="space-y-6">
@@ -155,23 +185,52 @@ export default function SlotFinder() {
         </div>
       )}
 
-      {daysScanned !== null && !loading && (
-        <p className="text-sm text-gray-500">
-          {suggestions.length} creneaux trouves sur les {daysScanned} prochains jours
-        </p>
+      {daysScanned !== null && !loading && allSlots.length > 0 && (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-sm text-gray-500">
+            {allSlots.length} créneaux trouvés sur les {daysScanned} prochains
+            jours
+          </p>
+          <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+            <button
+              onClick={() => setSortMode("distance")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                sortMode === "distance"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Par distance
+            </button>
+            <button
+              onClick={() => setSortMode("asap")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                sortMode === "asap"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Au plus tôt
+            </button>
+          </div>
+        </div>
       )}
 
-      {suggestions.length > 0 && (
+      {displayedSlots.length > 0 && (
         <div className="space-y-3">
-          {suggestions.map((s, i) => (
-            <SlotSuggestionCard key={`${s.date}-${s.startTime}`} suggestion={s} rank={i + 1} />
+          {displayedSlots.map((s, i) => (
+            <SlotSuggestionCard
+              key={`${s.date}-${s.startTime}`}
+              suggestion={s}
+              rank={i + 1}
+            />
           ))}
         </div>
       )}
 
-      {daysScanned !== null && suggestions.length === 0 && !loading && (
+      {daysScanned !== null && allSlots.length === 0 && !loading && (
         <p className="text-sm text-gray-500">
-          Aucun creneau disponible dans les 15 prochains jours pour cette adresse.
+          Aucun créneau disponible dans les 15 prochains jours pour cette adresse.
         </p>
       )}
     </div>

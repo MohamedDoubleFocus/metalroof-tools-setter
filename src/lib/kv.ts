@@ -17,6 +17,7 @@ export interface ClientCodeMeta {
   code: string;
   clientName: string;
   phoneNumber: string; // E.164
+  email?: string;      // optional — used for completion notification via Make.com
   createdAt: number;
   expiresAt: number;
 }
@@ -168,6 +169,118 @@ export async function setCodeResults(
   ttlSeconds: number
 ): Promise<void> {
   await setJson(resultsKey(code), results, Math.max(60, ttlSeconds));
+}
+
+// ─── Generation state (fan-out workers) ───────────────────────────────────
+
+import type { RoofStyle } from "@/types";
+
+/**
+ * Tracks the in-flight generation for a code while N parallel worker
+ * functions process it. The "remaining" counter is decremented atomically
+ * by each worker so the last one in fires the Make completion webhook.
+ */
+export interface GenJobSpec {
+  jobKey: string; // colorKey:roofStyle
+  colorKey: string;
+  roofStyle: RoofStyle;
+}
+
+export interface GenJobResult {
+  jobKey: string;
+  ok: boolean;
+  url?: string;
+  error?: string;
+}
+
+export interface GenMeta {
+  code: string;
+  sourceImageUrl: string; // original uploaded photo
+  enhancedImageUrl?: string; // filled after enhancement step
+  jobs: GenJobSpec[];
+  resultsBaseUrl: string; // absolute URL the client will land on
+  startedAt: number;
+}
+
+function genMetaKey(code: string) {
+  return `gen:${code}:meta`;
+}
+function genCounterKey(code: string) {
+  return `gen:${code}:remaining`;
+}
+function genJobKey(code: string, jobKey: string) {
+  return `gen:${code}:job:${jobKey}`;
+}
+function genJobsListKey(code: string) {
+  return `gen:${code}:jobkeys`;
+}
+
+const GEN_TTL_SECONDS = 24 * 60 * 60; // 24h — generation never takes that long
+
+export async function setGenMeta(meta: GenMeta): Promise<void> {
+  await setJson(genMetaKey(meta.code), meta, GEN_TTL_SECONDS);
+}
+
+export async function getGenMeta(code: string): Promise<GenMeta | null> {
+  return getJson<GenMeta>(genMetaKey(code));
+}
+
+export async function setGenEnhancedUrl(code: string, url: string): Promise<void> {
+  const meta = await getGenMeta(code);
+  if (!meta) return;
+  meta.enhancedImageUrl = url;
+  await setGenMeta(meta);
+}
+
+export async function setGenJobResult(
+  code: string,
+  result: GenJobResult
+): Promise<void> {
+  await setJson(genJobKey(code, result.jobKey), result, GEN_TTL_SECONDS);
+}
+
+export async function getAllGenJobResults(
+  code: string
+): Promise<GenJobResult[]> {
+  const list = await getJson<string[]>(genJobsListKey(code));
+  if (!list) return [];
+  const results: GenJobResult[] = [];
+  for (const jobKey of list) {
+    const r = await getJson<GenJobResult>(genJobKey(code, jobKey));
+    if (r) results.push(r);
+  }
+  return results;
+}
+
+export async function setGenJobsList(
+  code: string,
+  jobKeys: string[]
+): Promise<void> {
+  await setJson(genJobsListKey(code), jobKeys, GEN_TTL_SECONDS);
+}
+
+/**
+ * Initialize the remaining-jobs counter. Called once by the orchestrator.
+ */
+export async function setGenCounter(
+  code: string,
+  count: number
+): Promise<void> {
+  const c = await getClient();
+  await c.set(genCounterKey(code), String(count), {
+    expiration: { type: "EX", value: GEN_TTL_SECONDS },
+  });
+}
+
+/**
+ * Atomically decrement the remaining-jobs counter and return the new value.
+ * The worker that gets back 0 is the "last one in" and is responsible for
+ * firing the Make completion webhook.
+ */
+export async function decrementGenCounter(code: string): Promise<number> {
+  const c = await getClient();
+  const v = await c.decr(genCounterKey(code));
+  return v;
 }
 
 // ─── Rate limiting ─────────────────────────────────────────────────────────

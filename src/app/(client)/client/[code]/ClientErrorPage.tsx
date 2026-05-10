@@ -26,7 +26,7 @@ export default function ClientErrorPage({ title, message }: Props) {
         <p className="text-gray-600 leading-relaxed">{message}</p>
         <div className="mt-6 pt-6 border-t border-gray-100">
           <p className="text-sm text-gray-500">
-            Besoin d&apos;aide ?
+            Besoin d&apos;aide&nbsp;?
           </p>
           <p className="text-sm font-semibold text-gray-700 mt-1">
             (514) 867-0787

@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
     // legacy / explicit
     phoneNumber?: string;
     clientName?: string;
+    email?: string;
     // GHL native payload (root-level)
     phone?: string;
     full_name?: string;
@@ -97,6 +98,12 @@ export async function POST(request: NextRequest) {
     (body.clientName || body.full_name || composedName || "").trim() ||
     "client";
 
+  // Optional email — only stored if it looks like a real email.
+  // Used by Make.com to send a completion notification.
+  const rawEmail = (body.email || "").trim().toLowerCase();
+  const email =
+    rawEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail) ? rawEmail : undefined;
+
   // ─── 3. Generate unique code ───────────────────────────────────────────
   const code = generateCode();
   const now = Date.now();
@@ -104,6 +111,7 @@ export async function POST(request: NextRequest) {
     code,
     clientName,
     phoneNumber: normalizedPhone,
+    email,
     createdAt: now,
     expiresAt: now + CODE_TTL_SECONDS * 1000,
   };
@@ -130,7 +138,7 @@ export async function POST(request: NextRequest) {
 
   // ─── 5. Send SMS via OpenPhone ─────────────────────────────────────────
   const firstName = clientName.split(/\s+/)[0] || "client";
-  const smsContent = `Bonjour ${firstName}, voici votre simulation de toiture personnalisee Metal Roof Montreal :\n${url}\nLe lien expire dans 7 jours.`;
+  const smsContent = `Bonjour ${firstName}, voici votre simulation de toiture personnalisée Metal Roof Montréal :\n${url}\nLe lien expire dans 7 jours.`;
 
   const smsResult = await sendSms({ to: normalizedPhone, content: smsContent });
 

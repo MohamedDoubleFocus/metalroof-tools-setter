@@ -21,7 +21,7 @@ export default async function ClientCodePage({ params }: PageProps) {
     return (
       <ClientErrorPage
         title="Lien invalide"
-        message="Ce lien n'est pas valide. Verifiez le lien recu par SMS ou contactez votre representant Metal Roof Montreal."
+        message="Ce lien n'est pas valide. Vérifiez le lien reçu par SMS ou contactez votre représentant Metal Roof Montréal."
       />
     );
   }
@@ -31,8 +31,8 @@ export default async function ClientCodePage({ params }: PageProps) {
   if (!meta) {
     return (
       <ClientErrorPage
-        title="Lien invalide ou expire"
-        message="Ce lien n'existe pas ou a expire. Contactez votre representant Metal Roof Montreal pour en recevoir un nouveau."
+        title="Lien invalide ou expiré"
+        message="Ce lien n'existe pas ou a expiré. Contactez votre représentant Metal Roof Montréal pour en recevoir un nouveau."
       />
     );
   }
@@ -41,8 +41,8 @@ export default async function ClientCodePage({ params }: PageProps) {
   if (meta.expiresAt < Date.now()) {
     return (
       <ClientErrorPage
-        title="Ce lien a expire"
-        message="Ce lien de simulation a expire. Contactez votre representant Metal Roof Montreal pour en recevoir un nouveau."
+        title="Ce lien a expiré"
+        message="Ce lien de simulation a expiré. Contactez votre représentant Metal Roof Montréal pour en recevoir un nouveau."
       />
     );
   }

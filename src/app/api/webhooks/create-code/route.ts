@@ -18,11 +18,16 @@ export const maxDuration = 30;
  *
  * Auth: header `X-Webhook-Secret` must match env var WEBHOOK_SECRET.
  *
- * Body (JSON):
- *   {
- *     "phoneNumber": "5148670787" | "(514) 867-0787" | "+15148670787",
- *     "clientName": "Jean Tremblay"   // optional but recommended
- *   }
+ * Body (JSON) — accepts BOTH formats:
+ *
+ *   Custom format (legacy):
+ *     { "phoneNumber": "...", "clientName": "..." }
+ *
+ *   GHL native payload (just point the webhook URL, no custom data needed):
+ *     { "phone": "+15148670787", "full_name": "Jean Tremblay", "first_name": ..., ... }
+ *
+ * The handler resolves phone from `phoneNumber || phone`, and name from
+ * `clientName || full_name || (first_name + last_name)`.
  *
  * Response:
  *   200 { success: true, code, url }
@@ -49,29 +54,48 @@ export async function POST(request: NextRequest) {
   }
 
   // ─── 2. Parse body ─────────────────────────────────────────────────────
-  let body: { phoneNumber?: string; clientName?: string };
+  let body: {
+    // legacy / explicit
+    phoneNumber?: string;
+    clientName?: string;
+    // GHL native payload (root-level)
+    phone?: string;
+    full_name?: string;
+    first_name?: string;
+    last_name?: string;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Body JSON invalide" }, { status: 400 });
   }
 
-  if (!body.phoneNumber) {
+  // Resolve phone: explicit `phoneNumber` first, then GHL's `phone`
+  const rawPhone = body.phoneNumber || body.phone;
+  if (!rawPhone) {
     return NextResponse.json(
-      { error: "phoneNumber requis" },
+      { error: "phoneNumber requis (ou champ `phone` au root du payload)" },
       { status: 400 }
     );
   }
 
-  const normalizedPhone = normalizePhoneE164(body.phoneNumber);
+  const normalizedPhone = normalizePhoneE164(rawPhone);
   if (!normalizedPhone) {
     return NextResponse.json(
-      { error: "phoneNumber invalide (10 chiffres requis ou format E.164)" },
+      { error: "Numero de telephone invalide (10 chiffres requis ou format E.164)" },
       { status: 400 }
     );
   }
 
-  const clientName = (body.clientName || "").trim() || "client";
+  // Resolve client name: explicit `clientName` first, then GHL's `full_name`,
+  // then build from first_name + last_name, finally fall back to "client"
+  const composedName = [body.first_name, body.last_name]
+    .filter((s) => s && s.trim())
+    .join(" ")
+    .trim();
+  const clientName =
+    (body.clientName || body.full_name || composedName || "").trim() ||
+    "client";
 
   // ─── 3. Generate unique code ───────────────────────────────────────────
   const code = generateCode();

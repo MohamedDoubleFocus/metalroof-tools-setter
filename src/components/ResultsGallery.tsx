@@ -10,7 +10,7 @@ interface Props {
 const STYLE_LABELS: Record<string, string> = {
   wave_tile: "Tuile Ondulée Européenne",
   standing_seam: "Joint Debout",
-  shingle_tile: "Tuile Écaille Européenne",
+  shingle_tile: "Style européen",
 };
 
 function renderSection(
@@ -110,7 +110,7 @@ function renderSection(
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={group.shingleTile.resultUrl}
-                    alt={`${color?.frenchName} - Tuile Écaille`}
+                    alt={`${color?.frenchName} - Style européen`}
                     className="w-full h-auto"
                   />
                   <div className="p-3 bg-white text-center">

@@ -9,12 +9,6 @@ interface Props {
 
 const STYLES: { key: RoofStyle; label: string; description: string }[] = [
   {
-    key: "wave_tile",
-    label: "Tuile Ondulée Européenne",
-    description:
-      "Toiture en acier avec profil en S continu, fini émail semi-lustré",
-  },
-  {
     key: "standing_seam",
     label: "Joint Debout",
     description:
@@ -22,7 +16,7 @@ const STYLES: { key: RoofStyle; label: string; description: string }[] = [
   },
   {
     key: "shingle_tile",
-    label: "Tuile Écaille Européenne",
+    label: "Style européen",
     description:
       "Tuiles métalliques estampées à bord arrondi, légèrement bombées, rangées décalées, fini mat",
   },

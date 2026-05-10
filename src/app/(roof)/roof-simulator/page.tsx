@@ -1139,7 +1139,7 @@ export default function RoofSimulator() {
               ? "Tuile Onde"
               : frontFirst?.roofStyle === "standing_seam"
                 ? "Joint Debout"
-                : "Tuile Ecaille";
+                : "Style européen";
           const allFailed =
             frontFirst?.status === "error" &&
             (state.hasBackPhoto ? backFirst?.status === "error" : true);

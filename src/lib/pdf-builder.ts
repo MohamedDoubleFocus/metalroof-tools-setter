@@ -110,7 +110,7 @@ function drawColorPage(
 
   if (hasWave) drawStyle(page.waveTileBuffer!, "Tuile Ondulée Européenne");
   if (hasSeam) drawStyle(page.standingSeamBuffer!, "Joint Debout");
-  if (hasShingle) drawStyle(page.shingleTileBuffer!, "Tuile Écaille Européenne");
+  if (hasShingle) drawStyle(page.shingleTileBuffer!, "Style européen");
 
   drawFooter(doc);
 }

@@ -21,8 +21,12 @@ export interface CalendarEvent {
 export interface SlotSuggestion {
   date: string; // YYYY-MM-DD
   dayLabel: string; // e.g. "Lundi 14 avril"
-  startTime: string; // ISO
-  endTime: string; // ISO
+  /** Earliest possible appointment start time (ISO) */
+  windowStart: string;
+  /** Latest possible appointment start time (ISO) */
+  windowEnd: string;
+  /** Appointment duration in minutes (so UI knows what windowEnd "means") */
+  durationMinutes: number;
   insertAfterEventId: string | null;
   addedTravelMinutes: number;
   score: number; // lower = better

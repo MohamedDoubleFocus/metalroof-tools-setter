@@ -8,8 +8,8 @@ import { getSettings } from "@/lib/booking/settings";
 
 type SortMode = "distance" | "asap";
 
-const DISPLAY_LIMIT = 15;
-const DISTANCE_MAX_PER_DAY = 3; // diversity cap when sorting by distance
+// We display ALL availability windows the optimizer returns (1 per gap, so
+// at most ~3 per day). No artificial cap — the setter wants the full picture.
 
 export default function SlotFinder() {
   const [address, setAddress] = useState("");
@@ -118,28 +118,16 @@ export default function SlotFinder() {
     if (allSlots.length === 0) return [];
 
     if (sortMode === "asap") {
-      // Earliest first, no per-day cap — setter wants "next available"
-      return [...allSlots]
-        .sort(
-          (a, b) =>
-            new Date(a.startTime).getTime() -
-            new Date(b.startTime).getTime()
-        )
-        .slice(0, DISPLAY_LIMIT);
+      // Earliest window first — full list
+      return [...allSlots].sort(
+        (a, b) =>
+          new Date(a.windowStart).getTime() -
+          new Date(b.windowStart).getTime()
+      );
     }
 
-    // sortMode === "distance" — best score first, max 3/day for diversity
-    const sorted = [...allSlots].sort((a, b) => a.score - b.score);
-    const perDayCount = new Map<string, number>();
-    const out: SlotSuggestion[] = [];
-    for (const slot of sorted) {
-      const c = perDayCount.get(slot.date) ?? 0;
-      if (c >= DISTANCE_MAX_PER_DAY) continue;
-      out.push(slot);
-      perDayCount.set(slot.date, c + 1);
-      if (out.length >= DISPLAY_LIMIT) break;
-    }
-    return out;
+    // sortMode === "distance" — best score first — full list
+    return [...allSlots].sort((a, b) => a.score - b.score);
   }, [allSlots, sortMode]);
 
   return (
@@ -188,7 +176,7 @@ export default function SlotFinder() {
       {daysScanned !== null && !loading && allSlots.length > 0 && (
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-sm text-gray-500">
-            {allSlots.length} créneaux trouvés sur les {daysScanned} prochains
+            {allSlots.length} disponibilités sur les {daysScanned} prochains
             jours
           </p>
           <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
@@ -220,7 +208,7 @@ export default function SlotFinder() {
         <div className="space-y-3">
           {displayedSlots.map((s, i) => (
             <SlotSuggestionCard
-              key={`${s.date}-${s.startTime}`}
+              key={`${s.date}-${s.windowStart}`}
               suggestion={s}
               rank={i + 1}
             />

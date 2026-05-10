@@ -11,23 +11,26 @@ interface SequencePoint {
 }
 
 /**
- * Step (in minutes) used to scan candidate start-times within a gap.
- * 15 min strikes a balance: clean clock times (8h00, 8h15, 8h30, 8h45)
- * AND tight gaps still fit (a 19-min window aligned with quarters keeps a slot,
- * a 30-min step would lose it).
+ * Each gap in the calendar produces ONE availability "window":
+ *   - windowStart = earliest time the appointment could start
+ *   - windowEnd   = latest time it could start (still finishing in time
+ *                   for the next event + travel + working-hours bound)
+ *
+ * The setter then negotiates the exact time inside that window with the
+ * prospect over the phone — much more natural than offering 6 individual
+ * overlapping slots.
  */
-const SLOT_STEP_MINUTES = 15;
 
-/** Maximum number of slots returned per day (diversity across times of day) */
-const MAX_SLOTS_PER_DAY = 5;
-
-/**
- * Round a Date UP to the next multiple of `stepMinutes` (in Montreal local time).
- * Used so candidate start times land on neat clock positions (8:00, 8:30, 9:00…).
- */
-function ceilToStep(d: Date, stepMinutes: number): Date {
-  const ms = stepMinutes * 60 * 1000;
+/** Round Date UP to next 15-minute mark — keeps window boundaries clean. */
+function ceilTo15Min(d: Date): Date {
+  const ms = 15 * 60 * 1000;
   return new Date(Math.ceil(d.getTime() / ms) * ms);
+}
+
+/** Round Date DOWN to previous 15-minute mark. */
+function floorTo15Min(d: Date): Date {
+  const ms = 15 * 60 * 1000;
+  return new Date(Math.floor(d.getTime() / ms) * ms);
 }
 
 export async function findOptimalSlots(
@@ -143,8 +146,6 @@ export async function findOptimalSlots(
         now.getTime()
       )
     );
-    // Round UP to next clean slot step (8:30, 9:00, 9:30…)
-    const earliest = ceilToStep(earliestRaw, SLOT_STEP_MINUTES);
 
     // Upper bound for proposed start:
     //   proposedEnd ≤ dayEnd                       → start ≤ dayEnd - duration
@@ -160,46 +161,39 @@ export async function findOptimalSlots(
       Math.min(latestByDayEnd.getTime(), latestByNextStart.getTime())
     );
 
-    if (earliest.getTime() > latest.getTime()) continue; // no fit
+    // Round window boundaries to 15-min marks (cleanly displayable times).
+    // windowStart goes UP to next 15-min, windowEnd goes DOWN to previous
+    // 15-min — both staying within the feasible interval.
+    const windowStart = ceilTo15Min(earliestRaw);
+    const windowEnd = floorTo15Min(latest);
 
-    // Generate candidate slots at SLOT_STEP_MINUTES intervals
-    const gapSlots: SlotSuggestion[] = [];
-    for (
-      let t = earliest.getTime();
-      t <= latest.getTime();
-      t += SLOT_STEP_MINUTES * 60 * 1000
-    ) {
-      const proposedStart = new Date(t);
-      const proposedEnd = new Date(t + duration * 60 * 1000);
+    if (windowStart.getTime() > windowEnd.getTime()) continue; // no fit
 
-      gapSlots.push({
-        date,
-        dayLabel: "",
-        startTime: proposedStart.toISOString(),
-        endTime: proposedEnd.toISOString(),
-        insertAfterEventId: prev.id,
-        addedTravelMinutes: Math.round(addedTravel),
-        score: Math.round(addedTravel),
-        travelFromPrevious: travelFromPrev.durationMinutes,
-        travelToNext: travelToNext.durationMinutes,
-        previousIsHome: prev.id === null,
-        nextIsHome: next.id === null,
-        conflict: addedTravel > settings.maxAcceptableTravelMinutes,
-        dayEventCount: events.length,
-      });
-    }
-
-    suggestions.push(...gapSlots);
+    suggestions.push({
+      date,
+      dayLabel: "",
+      windowStart: windowStart.toISOString(),
+      windowEnd: windowEnd.toISOString(),
+      durationMinutes: duration,
+      insertAfterEventId: prev.id,
+      addedTravelMinutes: Math.round(addedTravel),
+      score: Math.round(addedTravel),
+      travelFromPrevious: travelFromPrev.durationMinutes,
+      travelToNext: travelToNext.durationMinutes,
+      previousIsHome: prev.id === null,
+      nextIsHome: next.id === null,
+      conflict: addedTravel > settings.maxAcceptableTravelMinutes,
+      dayEventCount: events.length,
+    });
   }
 
-  // All slots in this day share the same `addedTravel` cost per gap, so
-  // sort by addedTravel first, then by start time for stable diversity
+  // Sort windows by addedTravel first, then by chronological order
   suggestions.sort((a, b) => {
     if (a.score !== b.score) return a.score - b.score;
     return (
-      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      new Date(a.windowStart).getTime() - new Date(b.windowStart).getTime()
     );
   });
 
-  return suggestions.slice(0, MAX_SLOTS_PER_DAY);
+  return suggestions;
 }

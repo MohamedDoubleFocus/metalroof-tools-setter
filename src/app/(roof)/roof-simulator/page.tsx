@@ -1297,7 +1297,7 @@ export default function RoofSimulator() {
       </main>
 
       <footer className="bg-gray-100 border-t border-gray-200 py-4 text-center text-xs text-gray-500">
-        <p>Metal Roof Montreal | metalroofmontreal.com | (514) 867-0787</p>
+        <p>Metal Roof Montreal | metalroofmontreal.ca | (514) 867-0787</p>
         <p className="mt-1">
           Les images sont des simulations approximatives et peuvent differer du
           produit final installe.

@@ -33,7 +33,7 @@ export default function ClientLayout({
           <p className="font-semibold text-gray-700 mb-1">
             Metal Roof Montréal
           </p>
-          <p>metalroofmontreal.com &nbsp;|&nbsp; (514) 867-0787</p>
+          <p>metalroofmontreal.ca &nbsp;|&nbsp; (514) 867-0787</p>
           <p className="mt-2 text-gray-400">
             Les images sont des simulations approximatives et peuvent différer
             du produit final installé.

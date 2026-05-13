@@ -53,7 +53,7 @@ function drawFooter(doc: PDFKit.PDFDocument) {
     .fillColor("#999999")
     .font("Helvetica")
     .text(
-      "Metal Roof Montreal  |  metalroofmontreal.com  |  (514) 867-0787",
+      "Metal Roof Montreal  |  metalroofmontreal.ca  |  (514) 867-0787",
       MARGIN,
       y,
       { align: "center", width: CONTENT_W }
@@ -346,7 +346,7 @@ export async function buildPdf(params: PdfParams): Promise<Buffer> {
       .fontSize(12)
       .fillColor("#333333")
       .font("Helvetica")
-      .text("metalroofmontreal.com", MARGIN, contactY + 28, {
+      .text("metalroofmontreal.ca", MARGIN, contactY + 28, {
         align: "center",
         width: CONTENT_W,
       });

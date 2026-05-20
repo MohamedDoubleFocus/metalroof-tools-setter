@@ -97,7 +97,7 @@ function resultsKey(code: string) {
   return `code:${code}:results`;
 }
 
-async function getJson<T>(key: string): Promise<T | null> {
+export async function getJson<T>(key: string): Promise<T | null> {
   const c = await getClient();
   const raw = await c.get(key);
   if (raw == null) return null;
@@ -108,13 +108,30 @@ async function getJson<T>(key: string): Promise<T | null> {
   }
 }
 
-async function setJson<T>(
+export async function setJson<T>(
   key: string,
   value: T,
   ttlSeconds: number
 ): Promise<void> {
   const c = await getClient();
   await c.set(key, JSON.stringify(value), { expiration: { type: "EX", value: ttlSeconds } });
+}
+
+/**
+ * Set a JSON value WITHOUT expiration (long-lived data like leads & sectors).
+ * Used by the prospection module — data persists indefinitely.
+ */
+export async function setJsonPersistent<T>(key: string, value: T): Promise<void> {
+  const c = await getClient();
+  await c.set(key, JSON.stringify(value));
+}
+
+/**
+ * Delete a key from Redis.
+ */
+export async function delKey(key: string): Promise<void> {
+  const c = await getClient();
+  await c.del(key);
 }
 
 // ─── Code metadata ─────────────────────────────────────────────────────────

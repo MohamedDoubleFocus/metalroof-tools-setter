@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Accueil" },
   { href: "/roof-simulator", label: "Simulateur" },
   { href: "/booking", label: "Rendez-vous" },
+  { href: "/prospection", label: "Prospection" },
 ];
 
 export default function NavHeader() {
@@ -14,7 +15,9 @@ export default function NavHeader() {
 
   // Hide the internal navigation on the client-facing portal — clients should
   // never see links to the booking tool, internal simulator, or homepage.
-  if (pathname.startsWith("/client")) {
+  // Also hide on /prospection because it uses its own mobile-first chrome
+  // (top bar + bottom nav) and the global nav would steal vertical space.
+  if (pathname.startsWith("/client") || pathname.startsWith("/prospection")) {
     return null;
   }
 

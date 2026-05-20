@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { buildWarrantyPdf } from "@/lib/sav/warranty-pdf";
-import { getLogoPngBuffer } from "@/lib/image-utils";
+import { getWarrantyLogoPngBuffer } from "@/lib/image-utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
   // ─── Build the PDF ──────────────────────────────────────────────────
   let pdfBuffer: Buffer;
   try {
-    const logoBuffer = await getLogoPngBuffer();
+    const logoBuffer = await getWarrantyLogoPngBuffer();
     pdfBuffer = await buildWarrantyPdf({
       buyerName,
       addressLine1,

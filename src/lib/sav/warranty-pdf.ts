@@ -63,28 +63,9 @@ export async function buildWarrantyPdf(
     // ─── PAGE 1 — COVER ───────────────────────────────────────────────
     doc.addPage();
 
-    // Logo centered, ~120px wide
-    const logoW = 140;
+    // Logo centered (contient déjà "TOITURE MÉTALLIQUE MONTRÉAL")
+    const logoW = 220;
     doc.image(logoBuffer, (PAGE_W - logoW) / 2, 110, { width: logoW });
-
-    // Brand title under logo
-    doc
-      .fontSize(11)
-      .fillColor(BLACK)
-      .font("Helvetica-Bold")
-      .text("TOITURE MÉTALLIQUE", MARGIN, 250, {
-        align: "center",
-        width: CONTENT_W,
-        characterSpacing: 3,
-      });
-    doc
-      .fontSize(9)
-      .fillColor("#666666")
-      .text("MONTRÉAL", MARGIN, 268, {
-        align: "center",
-        width: CONTENT_W,
-        characterSpacing: 4,
-      });
 
     // Main title
     doc

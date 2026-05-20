@@ -86,22 +86,37 @@ export async function POST(request: NextRequest) {
     try {
       osmStreets = await fetchStreetsInPolygon(body.polygon as LatLng[]);
     } catch (err) {
-      // Sector is created but Overpass failed — return so user can see the polygon
+      console.error("[sectors] Overpass fetch failed:", err);
       return NextResponse.json({
         sector,
         streetCount: 0,
         warning:
-          "Secteur cree mais la liste de rues n'a pas pu etre recuperee : " +
-          (err instanceof Error ? err.message : "erreur OSM"),
+          "Secteur cree mais la liste de rues n'a pas pu etre recuperee. " +
+          "Verifie ta connexion ou reessaie dans quelques minutes. " +
+          "Erreur: " +
+          (err instanceof Error ? err.message : "erreur OSM inconnue"),
       });
     }
 
     // 3. Store streets and link them to the sector
-    if (osmStreets.length > 0) {
-      const streetIds = await createStreetsBulk(sector.id, osmStreets);
-      await setSectorStreetIds(sector.id, streetIds);
-      sector.streetIds = streetIds;
+    if (osmStreets.length === 0) {
+      console.warn(
+        "[sectors] Overpass returned 0 streets for polygon",
+        JSON.stringify(body.polygon).slice(0, 200)
+      );
+      return NextResponse.json({
+        sector,
+        streetCount: 0,
+        warning:
+          "Secteur cree mais aucune rue trouvee. Possibles causes : " +
+          "polygone trop petit, zone non couverte par OpenStreetMap, ou rues sans nom. " +
+          "Reessaie avec un polygone plus large.",
+      });
     }
+
+    const streetIds = await createStreetsBulk(sector.id, osmStreets);
+    await setSectorStreetIds(sector.id, streetIds);
+    sector.streetIds = streetIds;
 
     return NextResponse.json({
       sector,

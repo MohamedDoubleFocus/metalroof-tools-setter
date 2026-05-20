@@ -28,6 +28,7 @@ export default function LeadsList({
   refreshSignal = 0,
 }: Props) {
   const [date, setDate] = useState(todayDateKey());
+  const [dateMode, setDateMode] = useState<"date" | "all">("date");
   const [scope, setScope] = useState<"mine" | "all">("mine");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -40,7 +41,11 @@ export default function LeadsList({
     setError(null);
 
     const params = new URLSearchParams();
-    params.set("date", date);
+    if (dateMode === "all") {
+      params.set("range", "all");
+    } else {
+      params.set("date", date);
+    }
     if (scope === "mine") params.set("knockerId", knocker.id);
 
     fetch(`/api/prospection/leads?${params.toString()}`)
@@ -66,7 +71,7 @@ export default function LeadsList({
     return () => {
       cancelled = true;
     };
-  }, [date, scope, knocker.id, refreshSignal]);
+  }, [date, dateMode, scope, knocker.id, refreshSignal]);
 
   const filtered = useMemo(
     () => (statusFilter ? leads.filter((l) => l.status === statusFilter) : leads),
@@ -78,36 +83,62 @@ export default function LeadsList({
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      {/* Date + scope */}
-      <div className="flex items-center gap-3">
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
-        />
+      {/* Date selector */}
+      <div className="flex items-center gap-2 flex-wrap">
         <div className="flex bg-gray-100 rounded-xl p-1">
           <button
-            onClick={() => setScope("mine")}
+            onClick={() => setDateMode("date")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-              scope === "mine"
+              dateMode === "date"
                 ? "bg-white text-gray-900 shadow-sm"
                 : "text-gray-500"
             }`}
           >
-            Les miens
+            Par date
           </button>
           <button
-            onClick={() => setScope("all")}
+            onClick={() => setDateMode("all")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-              scope === "all"
+              dateMode === "all"
                 ? "bg-white text-gray-900 shadow-sm"
                 : "text-gray-500"
             }`}
           >
-            Toute l&apos;équipe
+            Tous les leads
           </button>
         </div>
+        {dateMode === "date" && (
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+          />
+        )}
+      </div>
+
+      {/* Scope (mine/all knockers) */}
+      <div className="flex bg-gray-100 rounded-xl p-1 w-fit">
+        <button
+          onClick={() => setScope("mine")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            scope === "mine"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-500"
+          }`}
+        >
+          Les miens
+        </button>
+        <button
+          onClick={() => setScope("all")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            scope === "all"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-500"
+          }`}
+        >
+          Toute l&apos;équipe
+        </button>
       </div>
 
       {/* Stats */}
@@ -115,7 +146,8 @@ export default function LeadsList({
         <div className="bg-white border border-gray-200 rounded-2xl p-4">
           <p className="text-xs text-gray-500 mb-2">
             {total} lead{total > 1 ? "s" : ""}{" "}
-            {scope === "mine" ? `de ${knocker.name}` : "de l'équipe"} ce jour
+            {scope === "mine" ? `de ${knocker.name}` : "de l'équipe"}{" "}
+            {dateMode === "all" ? "(toutes dates)" : "ce jour"}
           </p>
           <div className="grid grid-cols-5 gap-1 text-center">
             {(["absent", "meeting", "repasser", "suivi", "refus"] as LeadStatus[]).map(
@@ -179,7 +211,9 @@ export default function LeadsList({
       ) : filtered.length === 0 ? (
         <div className="text-center py-10 text-gray-400 text-sm">
           {total === 0
-            ? "Aucun lead pour cette date. Va sur l'onglet Ajouter pour commencer."
+            ? dateMode === "all"
+              ? "Aucun lead encore. Va sur l'onglet Ajouter pour commencer."
+              : "Aucun lead pour cette date."
             : "Aucun lead ne correspond au filtre."}
         </div>
       ) : (

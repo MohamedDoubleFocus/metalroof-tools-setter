@@ -20,7 +20,7 @@ interface Props {
  *   - Optional polygon for the active sector
  *   - Optional polylines per street (green = done, gray = todo)
  *
- * Pattern follows src/components/booking/DayMap.tsx (functional loader).
+ * Map is created ONCE on mount; overlays are recomputed on every data change.
  */
 export default function ProspectionMap({
   leads,
@@ -28,15 +28,15 @@ export default function ProspectionMap({
   streets = [],
   onStreetClick,
 }: Props) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const initialized = useRef(false);
-  const mapInstance = useRef<google.maps.Map | null>(null);
+  const mapDivRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
   const overlaysRef = useRef<google.maps.MVCObject[]>([]);
+  const [mapReady, setMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Build map once
+  // ─── Init map ONCE ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapDivRef.current) return;
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       setError("Clé Google Maps manquante (NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)");
@@ -46,27 +46,18 @@ export default function ProspectionMap({
     let cancelled = false;
     (async () => {
       try {
-        if (!initialized.current) {
-          setOptions({ key: apiKey });
-          initialized.current = true;
-        }
+        setOptions({ key: apiKey });
         const { Map } = (await importLibrary("maps")) as google.maps.MapsLibrary;
-        if (cancelled || !mapRef.current) return;
+        if (cancelled || !mapDivRef.current) return;
 
-        const center =
-          leads[0]
-            ? { lat: leads[0].lat, lng: leads[0].lng }
-            : sector?.polygon[0]
-              ? sector.polygon[0]
-              : { lat: 45.5017, lng: -73.5673 }; // Montreal fallback
-
-        mapInstance.current = new Map(mapRef.current, {
-          zoom: 14,
-          center,
+        mapRef.current = new Map(mapDivRef.current, {
+          zoom: 12,
+          center: { lat: 45.5017, lng: -73.5673 }, // Montreal fallback
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
         });
+        setMapReady(true);
       } catch {
         setError("Erreur de chargement Google Maps");
       }
@@ -75,12 +66,12 @@ export default function ProspectionMap({
     return () => {
       cancelled = true;
     };
-  }, [leads, sector]);
+  }, []);
 
-  // Render overlays whenever data changes
+  // ─── Render overlays whenever data changes (or map becomes ready) ───────
   useEffect(() => {
-    const map = mapInstance.current;
-    if (!map) return;
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
 
     // Clear previous overlays
     overlaysRef.current.forEach((o) => {
@@ -92,7 +83,7 @@ export default function ProspectionMap({
     const bounds = new google.maps.LatLngBounds();
     let hasBounds = false;
 
-    // Sector polygon (drawn first, under everything)
+    // 1) Sector polygon (drawn first, under everything)
     if (sector?.polygon && sector.polygon.length >= 3) {
       const poly = new google.maps.Polygon({
         paths: sector.polygon,
@@ -111,7 +102,7 @@ export default function ProspectionMap({
       });
     }
 
-    // Street polylines
+    // 2) Street polylines
     for (const street of streets) {
       if (street.geometry.length < 2) continue;
       const done = !!street.doneAt;
@@ -129,7 +120,7 @@ export default function ProspectionMap({
       overlaysRef.current.push(line);
     }
 
-    // Lead pins
+    // 3) Lead pins
     for (const lead of leads) {
       const color = statusColorHex(lead.status);
       const marker = new google.maps.Marker({
@@ -151,9 +142,17 @@ export default function ProspectionMap({
     }
 
     if (hasBounds) {
-      map.fitBounds(bounds, 60);
+      // Use a slight delay to ensure map has its dimensions before fitBounds
+      requestAnimationFrame(() => {
+        map.fitBounds(bounds, 60);
+        // For single point, fitBounds zooms to max — clamp it
+        if (leads.length === 1 && !sector) {
+          const z = map.getZoom();
+          if (z && z > 16) map.setZoom(16);
+        }
+      });
     }
-  }, [leads, sector, streets, onStreetClick]);
+  }, [leads, sector, streets, onStreetClick, mapReady]);
 
   if (error) {
     return (
@@ -165,7 +164,7 @@ export default function ProspectionMap({
 
   return (
     <div
-      ref={mapRef}
+      ref={mapDivRef}
       className="w-full h-[calc(100vh-180px)] sm:h-[600px] rounded-2xl border border-gray-200"
     />
   );

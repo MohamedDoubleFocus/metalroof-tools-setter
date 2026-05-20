@@ -52,11 +52,16 @@ export async function fetchStreetsInPolygon(
 
   const poly = buildPolyArg(polygon);
 
+  // Query for all named driveable streets that have any node inside the polygon.
+  // Wider filter than just "residential" so we also catch service roads and
+  // pedestrian/footway types found in some QC subdivisions.
   const query = `
-    [out:json][timeout:25];
-    way["highway"~"^(residential|primary|secondary|tertiary|unclassified|living_street)$"]
-       ["name"]
-       (poly:"${poly}");
+    [out:json][timeout:30];
+    (
+      way["highway"~"^(residential|primary|secondary|tertiary|unclassified|living_street|service|tertiary_link|secondary_link|primary_link)$"]
+         ["name"]
+         (poly:"${poly}");
+    );
     out geom;
   `;
 
@@ -67,7 +72,8 @@ export async function fetchStreetsInPolygon(
   });
 
   if (!res.ok) {
-    throw new Error(`Overpass API error ${res.status}: ${await res.text().catch(() => "")}`);
+    const text = await res.text().catch(() => "");
+    throw new Error(`Overpass API HTTP ${res.status} - ${text.slice(0, 300)}`);
   }
 
   const data = (await res.json()) as OverpassResponse;

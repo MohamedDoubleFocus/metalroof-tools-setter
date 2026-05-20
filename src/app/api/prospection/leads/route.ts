@@ -105,6 +105,8 @@ export async function POST(request: NextRequest) {
   try {
     const lead = await createLead({
       knockerId: body.knockerId,
+      clientName: body.clientName,
+      clientPhone: body.clientPhone,
       address: body.address,
       streetName: body.streetName || body.address,
       houseNumber: body.houseNumber || "",

@@ -79,8 +79,10 @@ export default function ProspectionPage() {
   }, [tab, knocker, mapScope, refreshSignal]);
 
   const handleLeadSubmitted = useCallback(() => {
+    // Bump the refresh signal so other tabs (Today / Map) reload when visited,
+    // but DON'T change the active tab — the knocker stays on the form to add
+    // the next lead. The form shows its own success toast.
     setRefreshSignal((n) => n + 1);
-    setTab("today");
   }, []);
 
   // Loading state during localStorage hydration

@@ -56,7 +56,7 @@ export default function LeadCard({ lead, onClick }: Props) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2 mb-1">
             <p className="font-bold text-gray-900 truncate">
-              {lead.address}
+              {lead.clientName || lead.address}
             </p>
             <span
               className={`shrink-0 px-2 py-0.5 rounded-full text-[11px] font-bold ${def.selected.split(" ").filter((c) => c.startsWith("bg-") || c.startsWith("text-")).join(" ")}`}
@@ -65,7 +65,22 @@ export default function LeadCard({ lead, onClick }: Props) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+          {/* If client name present, show address on second line; otherwise it's the title */}
+          {lead.clientName && (
+            <p className="text-xs text-gray-500 truncate">{lead.address}</p>
+          )}
+
+          {lead.clientPhone && (
+            <a
+              href={`tel:${lead.clientPhone.replace(/\D/g, "")}`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-block text-xs font-semibold text-accent mt-1 hover:underline"
+            >
+              📞 {lead.clientPhone}
+            </a>
+          )}
+
+          <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
             <span className="font-medium">{lead.knockerName}</span>
             <span>•</span>
             <span>{formatRelative(lead.createdAt)}</span>

@@ -65,7 +65,19 @@ export default function AddressAutocomplete({
   const streetInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
-  // Sync inputs when parent resets the value
+  // Refs to read the latest input values from inside Google's place_changed
+  // listener — the listener is registered once at mount and would otherwise
+  // capture stale values via closure.
+  const houseInputRef = useRef(houseInput);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    houseInputRef.current = houseInput;
+  }, [houseInput]);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  // Sync inputs when parent resets the value (e.g. form reset after submit)
   useEffect(() => {
     setStreetInput(value?.streetName ?? "");
     setHouseInput(value?.houseNumber ?? "");
@@ -108,12 +120,22 @@ export default function AddressAutocomplete({
           const lat = place.geometry.location.lat();
           const lng = place.geometry.location.lng();
 
-          const finalHouse = streetNumber || houseInput;
-          setStreetInput(route);
-          setHouseInput(finalHouse);
+          // CRITICAL: read latest house input via ref (not closure)
+          const currentHouse = houseInputRef.current;
+          // Prefer what the user already typed; only fall back to Google's value
+          // if the user hasn't typed anything yet.
+          const finalHouse = currentHouse?.trim() ? currentHouse : streetNumber;
 
-          onChange({
-            address: place.formatted_address ?? `${finalHouse} ${route}`,
+          setStreetInput(route);
+          if (!currentHouse?.trim() && streetNumber) {
+            setHouseInput(streetNumber);
+          }
+
+          onChangeRef.current({
+            address:
+              finalHouse && route
+                ? `${finalHouse} ${route}`
+                : (place.formatted_address ?? route),
             streetName: route,
             houseNumber: finalHouse,
             lat,

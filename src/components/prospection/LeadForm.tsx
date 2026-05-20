@@ -22,6 +22,8 @@ interface Props {
  */
 export default function LeadForm({ knockerId, onSubmitted }: Props) {
   const [address, setAddress] = useState<AddressValue | null>(null);
+  const [clientName, setClientName] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
   const [status, setStatus] = useState<LeadStatus | null>(null);
   const [meetingDate, setMeetingDate] = useState("");
   const [meetingTime, setMeetingTime] = useState("");
@@ -32,12 +34,15 @@ export default function LeadForm({ knockerId, onSubmitted }: Props) {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const needsMeeting = status === "meeting";
   const needsFollowUp = status === "repasser" || status === "suivi";
 
   const reset = useCallback(() => {
     setAddress(null);
+    setClientName("");
+    setClientPhone("");
     setStatus(null);
     setMeetingDate("");
     setMeetingTime("");
@@ -47,6 +52,15 @@ export default function LeadForm({ knockerId, onSubmitted }: Props) {
     setPhotoFile(null);
     setPhotoPreview(null);
     setError(null);
+  }, []);
+
+  // Auto-format phone as user types: (514) 867-0787
+  const formatPhone = useCallback((raw: string): string => {
+    const d = raw.replace(/\D/g, "").slice(0, 10);
+    if (d.length === 0) return "";
+    if (d.length <= 3) return `(${d}`;
+    if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
   }, []);
 
   const handlePhotoChange = useCallback(
@@ -111,6 +125,8 @@ export default function LeadForm({ knockerId, onSubmitted }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           knockerId,
+          clientName: clientName.trim() || undefined,
+          clientPhone: clientPhone.trim() || undefined,
           address: address.address,
           streetName: address.streetName,
           houseNumber: address.houseNumber,
@@ -132,6 +148,9 @@ export default function LeadForm({ knockerId, onSubmitted }: Props) {
       const data = await res.json();
       onSubmitted(data.lead as Lead);
       reset();
+      // Show transient confirmation toast — knocker stays on form to add next lead
+      setToast("✓ Lead enregistré avec succès");
+      setTimeout(() => setToast(null), 2500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
     } finally {
@@ -139,6 +158,8 @@ export default function LeadForm({ knockerId, onSubmitted }: Props) {
     }
   }, [
     address,
+    clientName,
+    clientPhone,
     status,
     needsMeeting,
     needsFollowUp,
@@ -164,10 +185,34 @@ export default function LeadForm({ knockerId, onSubmitted }: Props) {
         <AddressAutocomplete value={address} onChange={setAddress} />
       </section>
 
-      {/* 2. STATUT */}
+      {/* 2. INFOS CLIENT */}
       <section>
         <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
-          2. Statut
+          2. Client
+        </h3>
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            placeholder="Nom complet du client"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
+          />
+          <input
+            type="tel"
+            inputMode="tel"
+            value={clientPhone}
+            onChange={(e) => setClientPhone(formatPhone(e.target.value))}
+            placeholder="(514) 867-0787"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
+          />
+        </div>
+      </section>
+
+      {/* 3. STATUT */}
+      <section>
+        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
+          3. Statut
         </h3>
         <StatusPills value={status} onChange={setStatus} />
       </section>
@@ -288,6 +333,16 @@ export default function LeadForm({ knockerId, onSubmitted }: Props) {
       >
         {submitting ? "Enregistrement..." : "Enregistrer le lead"}
       </button>
+
+      {/* TOAST de confirmation — fixed au bas, ne navigue pas */}
+      {toast && (
+        <div
+          aria-live="polite"
+          className="fixed left-1/2 -translate-x-1/2 bottom-24 z-40 px-6 py-3 bg-emerald-600 text-white rounded-full shadow-lg font-bold text-sm flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300"
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

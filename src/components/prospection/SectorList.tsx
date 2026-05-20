@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import SectorDrawer from "./SectorDrawer";
 import ProspectionMap from "./ProspectionMap";
-import type { Sector, Street, LatLng } from "@/types/prospection";
+import AssignmentPanel from "./AssignmentPanel";
+import { todayDateKey } from "@/lib/prospection/utils";
+import type {
+  Sector,
+  Street,
+  LatLng,
+  SectorAssignment,
+} from "@/types/prospection";
 import type { Knocker } from "@/lib/prospection/knockers";
 
 interface Props {
@@ -24,6 +31,7 @@ export default function SectorList({ knocker }: Props) {
   const [activeStreets, setActiveStreets] = useState<Street[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [todayAssignments, setTodayAssignments] = useState<SectorAssignment[]>([]);
 
   const loadSectors = useCallback(async () => {
     setLoading(true);
@@ -43,6 +51,14 @@ export default function SectorList({ knocker }: Props) {
   useEffect(() => {
     loadSectors();
   }, [loadSectors]);
+
+  // Load today's assignments for the summary at the top of the list view
+  useEffect(() => {
+    fetch(`/api/prospection/assignments?date=${todayDateKey()}`)
+      .then((r) => r.json())
+      .then((d) => setTodayAssignments(d.assignments || []))
+      .catch(() => {});
+  }, []);
 
   const openSector = useCallback(async (id: string) => {
     setActiveId(id);
@@ -73,6 +89,10 @@ export default function SectorList({ knocker }: Props) {
         throw new Error(d.error || "Erreur création secteur");
       }
       const result = await res.json();
+      // Surface Overpass warnings to the user (e.g. polygon too small, no streets found)
+      if (result.warning) {
+        alert(`⚠️ ${result.warning}`);
+      }
       await loadSectors();
       setView("list");
       // Open the newly created sector
@@ -167,6 +187,14 @@ export default function SectorList({ knocker }: Props) {
               onStreetClick={toggleStreetDone}
             />
 
+            {sector && (
+              <AssignmentPanel
+                sectorId={sector.id}
+                sectorName={sector.name}
+                currentKnocker={knocker}
+              />
+            )}
+
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                 {error}
@@ -247,6 +275,29 @@ export default function SectorList({ knocker }: Props) {
           + Nouveau
         </button>
       </div>
+
+      {/* Today's assignments — quick summary */}
+      {todayAssignments.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+          <p className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2">
+            Aujourd&apos;hui
+          </p>
+          <ul className="space-y-1">
+            {todayAssignments.map((a) => (
+              <li key={a.id} className="text-sm text-blue-950">
+                <span className="font-bold">{a.knockerName}</span>{" "}
+                <span className="text-blue-700">→</span>{" "}
+                <button
+                  onClick={() => openSector(a.sectorId)}
+                  className="font-semibold underline"
+                >
+                  {a.sectorName}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">

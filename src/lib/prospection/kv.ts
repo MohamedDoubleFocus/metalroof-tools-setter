@@ -21,9 +21,11 @@ import type {
   Lead,
   Sector,
   Street,
+  SectorAssignment,
   CreateLeadInput,
   UpdateLeadInput,
   CreateSectorInput,
+  CreateAssignmentInput,
   LeadStatus,
 } from "@/types/prospection";
 
@@ -37,6 +39,11 @@ const sectorKey = (id: string) => `sector:${id}`;
 const sectorsAllKey = () => `sectors:all`;
 
 const streetKey = (id: string) => `street:${id}`;
+
+const assignmentKey = (id: string) => `assignment:${id}`;
+const assignmentsByDateKey = (date: string) => `assignments:by-date:${date}`;
+const assignmentsBySectorKey = (sectorId: string) =>
+  `assignments:by-sector:${sectorId}`;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -74,6 +81,8 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
     id,
     knockerId: input.knockerId,
     knockerName: getKnockerName(input.knockerId),
+    clientName: input.clientName?.trim() || undefined,
+    clientPhone: input.clientPhone?.trim() || undefined,
     address: input.address,
     streetName: normalizeStreetName(input.streetName),
     houseNumber: input.houseNumber,
@@ -109,15 +118,17 @@ export async function updateLead(
 
   const updated: Lead = {
     ...existing,
+    clientName: patch.clientName ?? existing.clientName,
+    clientPhone: patch.clientPhone ?? existing.clientPhone,
     status: patch.status ?? existing.status,
     meetingAt:
       patch.meetingAt === null
         ? undefined
-        : patch.meetingAt ?? existing.meetingAt,
+        : (patch.meetingAt ?? existing.meetingAt),
     followUpAt:
       patch.followUpAt === null
         ? undefined
-        : patch.followUpAt ?? existing.followUpAt,
+        : (patch.followUpAt ?? existing.followUpAt),
     notes: patch.notes ?? existing.notes,
     photoUrl: patch.photoUrl ?? existing.photoUrl,
     updatedAt: Date.now(),
@@ -267,6 +278,74 @@ export async function toggleStreetDone(
   }
   await setJsonPersistent(streetKey(streetId), street);
   return street;
+}
+
+// ─── Assignments ─────────────────────────────────────────────────────────
+
+export async function createAssignment(
+  input: CreateAssignmentInput
+): Promise<SectorAssignment> {
+  const sector = await getSector(input.sectorId);
+  if (!sector) throw new Error("Secteur introuvable");
+
+  const id = newId();
+  const assignment: SectorAssignment = {
+    id,
+    sectorId: input.sectorId,
+    sectorName: sector.name,
+    knockerId: input.knockerId,
+    knockerName: getKnockerName(input.knockerId),
+    date: input.date,
+    createdAt: Date.now(),
+    createdBy: input.createdBy,
+  };
+  await setJsonPersistent(assignmentKey(id), assignment);
+  await pushToList(assignmentsByDateKey(input.date), id);
+  await pushToList(assignmentsBySectorKey(input.sectorId), id);
+  return assignment;
+}
+
+export async function getAssignment(id: string): Promise<SectorAssignment | null> {
+  return getJson<SectorAssignment>(assignmentKey(id));
+}
+
+export async function listAssignmentsByDate(
+  date: string
+): Promise<SectorAssignment[]> {
+  const ids = await getList(assignmentsByDateKey(date));
+  if (ids.length === 0) return [];
+  const list = await Promise.all(ids.map((id) => getAssignment(id)));
+  return list.filter((a): a is SectorAssignment => a !== null);
+}
+
+export async function listAssignmentsBySector(
+  sectorId: string
+): Promise<SectorAssignment[]> {
+  const ids = await getList(assignmentsBySectorKey(sectorId));
+  if (ids.length === 0) return [];
+  const list = await Promise.all(ids.map((id) => getAssignment(id)));
+  return list
+    .filter((a): a is SectorAssignment => a !== null)
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function deleteAssignment(id: string): Promise<boolean> {
+  const a = await getAssignment(id);
+  if (!a) return false;
+  await delKey(assignmentKey(id));
+  // Remove from date index
+  const byDate = await getList(assignmentsByDateKey(a.date));
+  await setJsonPersistent(
+    assignmentsByDateKey(a.date),
+    byDate.filter((x) => x !== id)
+  );
+  // Remove from sector index
+  const bySector = await getList(assignmentsBySectorKey(a.sectorId));
+  await setJsonPersistent(
+    assignmentsBySectorKey(a.sectorId),
+    bySector.filter((x) => x !== id)
+  );
+  return true;
 }
 
 // ─── Utilities ───────────────────────────────────────────────────────────

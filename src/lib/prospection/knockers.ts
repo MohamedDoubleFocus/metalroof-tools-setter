@@ -16,7 +16,7 @@ export interface Knocker {
 
 export const KNOCKERS: Knocker[] = [
   { id: "mohamed", name: "Mohamed" },
-  { id: "knocker2", name: "Knocker 2" },
+  { id: "knocker2", name: "Akram" },
   { id: "knocker3", name: "Knocker 3" },
 ];
 

@@ -1,10 +1,10 @@
 /**
  * Make.com webhook for prospection events.
  *
- * Fires whenever a lead is created or updated with a status that should
- * appear in Google Calendar / CRM (meeting, repasser, suivi). The
- * Make scenario on the other end decodes the payload and creates the
- * matching event / task / contact.
+ * Fires ONLY when a lead is CREATED with a status that should appear in
+ * Google Calendar / CRM (meeting, repasser, suivi). Updates and deletes
+ * are intentionally NOT notified — Make should not try to mirror lead
+ * mutations after the fact (would create stale calendar entries).
  *
  * Configuration:
  *   - Set MAKE_PROSPECTION_WEBHOOK_URL in your Vercel environment.
@@ -17,10 +17,7 @@ import type { Lead, LeadStatus } from "@/types/prospection";
 /** Statuses that should trigger a calendar / CRM notification. */
 const NOTIFIABLE_STATUSES: LeadStatus[] = ["meeting", "repasser", "suivi"];
 
-export type ProspectionEventType =
-  | "lead.created"
-  | "lead.updated"
-  | "lead.deleted";
+export type ProspectionEventType = "lead.created";
 
 interface ProspectionWebhookPayload {
   type: ProspectionEventType;

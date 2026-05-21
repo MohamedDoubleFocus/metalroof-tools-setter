@@ -23,10 +23,14 @@ export default function SectorDrawer({
   initialCenter,
 }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
   const polygonRef = useRef<google.maps.Polygon | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const placesAutoRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [polygonCoords, setPolygonCoords] = useState<LatLng[] | null>(null);
   const [name, setName] = useState("");
+  const [searchValue, setSearchValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,9 +46,10 @@ export default function SectorDrawer({
     (async () => {
       try {
         setOptions({ key: apiKey });
-        const [{ Map }, drawing] = await Promise.all([
+        const [{ Map }, drawing, places] = await Promise.all([
           importLibrary("maps") as Promise<google.maps.MapsLibrary>,
           importLibrary("drawing") as Promise<google.maps.DrawingLibrary>,
+          importLibrary("places") as Promise<google.maps.PlacesLibrary>,
         ]);
 
         if (cancelled || !mapRef.current) return;
@@ -58,6 +63,26 @@ export default function SectorDrawer({
           streetViewControl: false,
           fullscreenControl: false,
         });
+        mapInstanceRef.current = map;
+
+        // Wire address search → recenter map on chosen place
+        if (searchInputRef.current) {
+          const ac = new places.Autocomplete(searchInputRef.current, {
+            componentRestrictions: { country: "ca" },
+            fields: ["geometry", "formatted_address"],
+          });
+          ac.addListener("place_changed", () => {
+            const place = ac.getPlace();
+            const loc = place.geometry?.location;
+            if (!loc) return;
+            map.setCenter({ lat: loc.lat(), lng: loc.lng() });
+            map.setZoom(18);
+            if (place.formatted_address) {
+              setSearchValue(place.formatted_address);
+            }
+          });
+          placesAutoRef.current = ac;
+        }
 
         // Try to refine center via geolocation (non-blocking)
         if (!initialCenter && typeof navigator !== "undefined" && navigator.geolocation) {
@@ -172,9 +197,27 @@ export default function SectorDrawer({
         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
       />
 
+      {/* Quick address search — recentres the map so you can build sectors
+          anywhere in QC without panning by hand */}
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+          🔎
+        </span>
+        <input
+          ref={searchInputRef}
+          type="search"
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+          placeholder="Rechercher une adresse pour centrer la carte..."
+          autoComplete="off"
+          className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+        />
+      </div>
+
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-900">
-        <span className="font-semibold">📍 Comment dessiner :</span> Clique sur
-        chaque coin du pâté de maisons. Termine avec un double-clic ou en
+        <span className="font-semibold">📍 Comment dessiner :</span> Cherche
+        d&apos;abord une adresse pour zoomer dans le bon quartier, puis clique
+        sur chaque coin du pâté de maisons. Termine avec un double-clic ou en
         cliquant sur le premier point. On va lister automatiquement toutes les
         rues à l&apos;intérieur.
       </div>

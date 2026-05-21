@@ -7,6 +7,7 @@ import LeadForm from "@/components/prospection/LeadForm";
 import LeadsList from "@/components/prospection/LeadsList";
 import ProspectionMap from "@/components/prospection/ProspectionMap";
 import SectorList from "@/components/prospection/SectorList";
+import LeadDetailDrawer from "@/components/prospection/LeadDetailDrawer";
 import BottomNav, {
   type ProspectionTab,
 } from "@/components/prospection/BottomNav";
@@ -26,10 +27,14 @@ export default function ProspectionPage() {
   const [tab, setTab] = useState<ProspectionTab>("add");
   const [refreshSignal, setRefreshSignal] = useState(0);
 
-  // For the map tab: lazily load all leads (today across team)
+  // For the map tab: lazily load leads. Default range = "all" (every lead ever)
+  // so the setter sees the full history; togglable to "today" if needed.
   const [mapLeads, setMapLeads] = useState<Lead[]>([]);
   const [mapLoading, setMapLoading] = useState(false);
   const [mapScope, setMapScope] = useState<"mine" | "all">("all");
+  const [mapRange, setMapRange] = useState<"all" | "today">("all");
+  const [mapSearch, setMapSearch] = useState("");
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   // Sync tab with URL query (so bookmarking/sharing works and back button feels right)
   useEffect(() => {
@@ -57,13 +62,17 @@ export default function ProspectionPage() {
     window.history.replaceState(null, "", url.toString());
   }, [tab]);
 
-  // Fetch map leads when entering the map tab or when knocker scope changes
+  // Fetch map leads when entering the map tab or when scope/range changes
   useEffect(() => {
     if (tab !== "map" || !knocker) return;
     let cancelled = false;
     setMapLoading(true);
     const params = new URLSearchParams();
-    params.set("date", todayDateKey());
+    if (mapRange === "all") {
+      params.set("range", "all");
+    } else {
+      params.set("date", todayDateKey());
+    }
     if (mapScope === "mine") params.set("knockerId", knocker.id);
     fetch(`/api/prospection/leads?${params.toString()}`)
       .then((r) => r.json())
@@ -76,7 +85,7 @@ export default function ProspectionPage() {
     return () => {
       cancelled = true;
     };
-  }, [tab, knocker, mapScope, refreshSignal]);
+  }, [tab, knocker, mapScope, mapRange, refreshSignal]);
 
   const handleLeadSubmitted = useCallback(() => {
     // Bump the refresh signal so other tabs (Today / Map) reload when visited,
@@ -137,16 +146,58 @@ export default function ProspectionPage() {
 
         {/* ─── TODAY ─────────────────────────────────── */}
         {tab === "today" && (
-          <LeadsList knocker={knocker} refreshSignal={refreshSignal} />
+          <LeadsList
+            knocker={knocker}
+            refreshSignal={refreshSignal}
+            onPickLead={setSelectedLead}
+          />
+        )}
+
+        {/* Shared lead drawer also surfaces on the Today tab */}
+        {tab === "today" && selectedLead && (
+          <LeadDetailDrawer
+            lead={selectedLead}
+            onClose={() => setSelectedLead(null)}
+            onChanged={(updated) => {
+              setSelectedLead(null);
+              setRefreshSignal((n) => n + 1);
+              if (updated) {
+                // best-effort: refresh map if loaded
+                setMapLeads((leads) =>
+                  leads.map((l) => (l.id === updated.id ? updated : l))
+                );
+              }
+            }}
+          />
         )}
 
         {/* ─── MAP ────────────────────────────────────── */}
         {tab === "map" && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">
-                {mapLeads.length} lead{mapLeads.length > 1 ? "s" : ""} aujourd&apos;hui
-              </p>
+            {/* Filters: range + scope */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex bg-gray-100 rounded-xl p-1">
+                <button
+                  onClick={() => setMapRange("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                    mapRange === "all"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500"
+                  }`}
+                >
+                  Tous les leads
+                </button>
+                <button
+                  onClick={() => setMapRange("today")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                    mapRange === "today"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500"
+                  }`}
+                >
+                  Aujourd&apos;hui
+                </button>
+              </div>
               <div className="flex bg-gray-100 rounded-xl p-1">
                 <button
                   onClick={() => setMapScope("mine")}
@@ -170,10 +221,74 @@ export default function ProspectionPage() {
                 </button>
               </div>
             </div>
-            {mapLoading ? (
-              <div className="text-center py-10 text-gray-400">Chargement de la carte...</div>
-            ) : (
-              <ProspectionMap leads={mapLeads} />
+
+            {/* Search */}
+            <input
+              type="search"
+              value={mapSearch}
+              onChange={(e) => setMapSearch(e.target.value)}
+              placeholder="Rechercher (adresse, nom, téléphone, notes)..."
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+            />
+
+            {(() => {
+              const q = mapSearch.trim().toLowerCase();
+              const filtered = q
+                ? mapLeads.filter((l) => {
+                    const blob = [
+                      l.address,
+                      l.clientName,
+                      l.clientPhone,
+                      l.notes,
+                      l.knockerName,
+                      l.status,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")
+                      .toLowerCase();
+                    return blob.includes(q);
+                  })
+                : mapLeads;
+
+              return (
+                <>
+                  <p className="text-sm text-gray-500">
+                    {filtered.length} lead{filtered.length > 1 ? "s" : ""}
+                    {q && ` (sur ${mapLeads.length})`}
+                  </p>
+                  {mapLoading ? (
+                    <div className="text-center py-10 text-gray-400">
+                      Chargement de la carte...
+                    </div>
+                  ) : (
+                    <ProspectionMap
+                      leads={filtered}
+                      onLeadClick={setSelectedLead}
+                    />
+                  )}
+                </>
+              );
+            })()}
+
+            {/* Lead detail/edit drawer */}
+            {selectedLead && (
+              <LeadDetailDrawer
+                lead={selectedLead}
+                onClose={() => setSelectedLead(null)}
+                onChanged={(updated) => {
+                  if (updated === null) {
+                    // deleted
+                    setMapLeads((leads) =>
+                      leads.filter((l) => l.id !== selectedLead.id)
+                    );
+                  } else {
+                    setMapLeads((leads) =>
+                      leads.map((l) => (l.id === updated.id ? updated : l))
+                    );
+                  }
+                  setSelectedLead(null);
+                }}
+              />
             )}
           </div>
         )}

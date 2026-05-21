@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { getLead, updateLead, deleteLead } from "@/lib/prospection/kv";
+import { fireProspectionWebhook } from "@/lib/prospection/make-webhook";
 import type { UpdateLeadInput, LeadStatus } from "@/types/prospection";
 
 export const runtime = "nodejs";
@@ -45,6 +47,7 @@ export async function PATCH(
   if (!updated) {
     return NextResponse.json({ error: "Lead introuvable" }, { status: 404 });
   }
+  after(() => fireProspectionWebhook("lead.updated", updated));
   return NextResponse.json({ lead: updated });
 }
 
@@ -53,9 +56,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const existing = await getLead(id);
   const ok = await deleteLead(id);
   if (!ok) {
     return NextResponse.json({ error: "Lead introuvable" }, { status: 404 });
+  }
+  if (existing) {
+    after(() => fireProspectionWebhook("lead.deleted", existing));
   }
   return NextResponse.json({ success: true });
 }

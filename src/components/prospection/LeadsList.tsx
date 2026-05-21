@@ -31,6 +31,7 @@ export default function LeadsList({
   const [dateMode, setDateMode] = useState<"date" | "all">("date");
   const [scope, setScope] = useState<"mine" | "all">("mine");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | null>(null);
+  const [search, setSearch] = useState("");
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,10 +74,28 @@ export default function LeadsList({
     };
   }, [date, dateMode, scope, knocker.id, refreshSignal]);
 
-  const filtered = useMemo(
-    () => (statusFilter ? leads.filter((l) => l.status === statusFilter) : leads),
-    [leads, statusFilter]
-  );
+  const filtered = useMemo(() => {
+    let out = leads;
+    if (statusFilter) out = out.filter((l) => l.status === statusFilter);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      out = out.filter((l) => {
+        const blob = [
+          l.address,
+          l.clientName,
+          l.clientPhone,
+          l.notes,
+          l.knockerName,
+          l.status,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return blob.includes(q);
+      });
+    }
+    return out;
+  }, [leads, statusFilter, search]);
 
   const counts = useMemo(() => leadStatusCount(leads), [leads]);
   const total = leads.length;
@@ -140,6 +159,15 @@ export default function LeadsList({
           Toute l&apos;équipe
         </button>
       </div>
+
+      {/* Search */}
+      <input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Rechercher (adresse, nom, téléphone, notes)..."
+        className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+      />
 
       {/* Stats */}
       {total > 0 && (

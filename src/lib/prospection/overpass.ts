@@ -13,7 +13,24 @@
 import type { LatLng } from "@/types/prospection";
 import { normalizeStreetName } from "./streets";
 
-const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
+/**
+ * Overpass mirrors — we try them in order. The main `overpass-api.de` endpoint
+ * is occasionally throttled or returns 406 to scripted requests; the Kumi
+ * mirror is a stable fallback maintained by the OSM community.
+ */
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
+
+/**
+ * Overpass strictly requires a non-empty User-Agent identifying the caller.
+ * Requests without one frequently return 406 Not Acceptable from the main
+ * endpoint. See https://operations.osmfoundation.org/policies/api/
+ */
+const OVERPASS_USER_AGENT =
+  "MetalRoofMontreal-Prospection/1.0 (contact@groupebricole.com)";
 
 export interface OverpassStreet {
   name: string;
@@ -65,15 +82,37 @@ export async function fetchStreetsInPolygon(
     out geom;
   `;
 
-  const res = await fetch(OVERPASS_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `data=${encodeURIComponent(query)}`,
-  });
+  // Try each mirror in order until one succeeds. A 406 / 429 / 504 on the
+  // primary just means "this mirror is unhappy right now" — the alternatives
+  // serve the same data.
+  let res: Response | null = null;
+  let lastError = "";
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const r = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+          "User-Agent": OVERPASS_USER_AGENT,
+        },
+        body: `data=${encodeURIComponent(query)}`,
+      });
+      if (r.ok) {
+        res = r;
+        break;
+      }
+      const text = await r.text().catch(() => "");
+      lastError = `HTTP ${r.status} (${endpoint}) - ${text.slice(0, 200)}`;
+      console.warn("[overpass] mirror failed, trying next:", lastError);
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+      console.warn("[overpass] mirror network error:", endpoint, lastError);
+    }
+  }
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Overpass API HTTP ${res.status} - ${text.slice(0, 300)}`);
+  if (!res) {
+    throw new Error(`Overpass API indisponible — ${lastError}`);
   }
 
   const data = (await res.json()) as OverpassResponse;

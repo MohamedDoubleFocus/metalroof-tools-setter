@@ -19,15 +19,9 @@ interface Props {
 }
 
 /**
- * Combined input:
- *   1) "📍 Detect my location" button → geolocates the device, calls
- *      /api/prospection/reverse-geocode, pre-fills the street name. The
- *      knocker just types the civic number after.
- *   2) Google Places Autocomplete on the street field — restricted to Canada,
- *      so suggestions stay tight to Québec municipalities.
- *
- * The geolocation path is the FAST path most knockers will use in the field;
- * the autocomplete is the FALLBACK when geo is denied or inaccurate.
+ * Address input pair: civic number + street, the street powered by Google
+ * Places Autocomplete restricted to Canada so suggestions stay tight to
+ * Québec municipalities.
  */
 
 let googleLoaded = false;
@@ -59,8 +53,6 @@ export default function AddressAutocomplete({
 }: Props) {
   const [streetInput, setStreetInput] = useState(value?.streetName ?? "");
   const [houseInput, setHouseInput] = useState(value?.houseNumber ?? "");
-  const [geoLoading, setGeoLoading] = useState(false);
-  const [geoError, setGeoError] = useState<string | null>(null);
   const [autocompleteReady, setAutocompleteReady] = useState(false);
   const streetInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -156,67 +148,6 @@ export default function AddressAutocomplete({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleDetectLocation = useCallback(async () => {
-    setGeoError(null);
-
-    if (!navigator.geolocation) {
-      setGeoError("La géolocalisation n'est pas disponible sur cet appareil.");
-      return;
-    }
-
-    setGeoLoading(true);
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude: lat, longitude: lng } = pos.coords;
-          const res = await fetch("/api/prospection/reverse-geocode", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat, lng }),
-          });
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data.error || "Géocodage inverse échoué");
-          }
-          const data = await res.json();
-          setStreetInput(data.streetName || "");
-          // Pre-fill house number only if geocoder gave one. Most of the time
-          // it doesn't (we're standing on the sidewalk, not on a numbered point),
-          // so we leave the house field for the knocker to type manually.
-          if (data.houseNumber) setHouseInput(data.houseNumber);
-
-          onChange({
-            address: data.formattedAddress,
-            streetName: data.streetName,
-            houseNumber: data.houseNumber || houseInput,
-            lat,
-            lng,
-          });
-        } catch (err) {
-          setGeoError(
-            err instanceof Error ? err.message : "Erreur géocodage inverse"
-          );
-        } finally {
-          setGeoLoading(false);
-        }
-      },
-      (err) => {
-        setGeoLoading(false);
-        if (err.code === err.PERMISSION_DENIED) {
-          setGeoError(
-            "Permission refusée. Active la géolocalisation dans ton navigateur."
-          );
-        } else if (err.code === err.TIMEOUT) {
-          setGeoError("Délai dépassé. Réessaie ou tape l'adresse à la main.");
-        } else {
-          setGeoError("Impossible d'obtenir ta position.");
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-    );
-  }, [houseInput, onChange]);
-
   // When user manually edits the house number, merge it back into the value
   // (only if we have a street already locked in via geo/autocomplete)
   const handleHouseChange = useCallback(
@@ -237,33 +168,6 @@ export default function AddressAutocomplete({
 
   return (
     <div className="space-y-3">
-      <button
-        type="button"
-        onClick={handleDetectLocation}
-        disabled={geoLoading}
-        className="w-full flex items-center justify-center gap-2 py-3 bg-accent text-white rounded-xl font-semibold text-sm hover:bg-accent-light transition-colors disabled:bg-gray-300"
-      >
-        {geoLoading ? (
-          <>
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            Détection en cours...
-          </>
-        ) : (
-          <>
-            <span className="text-base">📍</span>
-            Détecter ma position
-          </>
-        )}
-      </button>
-
-      {geoError && (
-        <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-xs">
-          {geoError}
-        </div>
-      )}
-
-      <div className="text-xs text-gray-400 text-center">— ou —</div>
-
       <div className="grid grid-cols-[110px_1fr] gap-2">
         <div>
           <label className="block text-xs font-semibold text-gray-600 mb-1">

@@ -12,6 +12,8 @@ interface Props {
   streets?: Street[];
   /** Optional callback when a street polyline is tapped */
   onStreetClick?: (street: Street) => void;
+  /** Optional callback when a lead pin is tapped — opens the edit drawer */
+  onLeadClick?: (lead: Lead) => void;
 }
 
 /**
@@ -27,6 +29,7 @@ export default function ProspectionMap({
   sector = null,
   streets = [],
   onStreetClick,
+  onLeadClick,
 }: Props) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -135,7 +138,11 @@ export default function ProspectionMap({
           strokeColor: "#FFFFFF",
           strokeWeight: 2,
         },
+        clickable: !!onLeadClick,
       });
+      if (onLeadClick) {
+        marker.addListener("click", () => onLeadClick(lead));
+      }
       overlaysRef.current.push(marker);
       bounds.extend({ lat: lead.lat, lng: lead.lng });
       hasBounds = true;
@@ -152,7 +159,7 @@ export default function ProspectionMap({
         }
       });
     }
-  }, [leads, sector, streets, onStreetClick, mapReady]);
+  }, [leads, sector, streets, onStreetClick, onLeadClick, mapReady]);
 
   if (error) {
     return (

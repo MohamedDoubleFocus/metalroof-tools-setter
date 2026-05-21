@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import {
   createLead,
   listLeadsByDate,
@@ -6,6 +7,7 @@ import {
   todayDateKey,
 } from "@/lib/prospection/kv";
 import { getKnockerById } from "@/lib/prospection/knockers";
+import { fireProspectionWebhook } from "@/lib/prospection/make-webhook";
 import type { CreateLeadInput, LeadStatus } from "@/types/prospection";
 
 export const runtime = "nodejs";
@@ -119,6 +121,11 @@ export async function POST(request: NextRequest) {
       photoUrl: body.photoUrl,
       sectorId: body.sectorId,
     });
+
+    // Fire the Make.com webhook in the background so the response
+    // returns immediately to the knocker (door-to-door = patience minimale).
+    after(() => fireProspectionWebhook("lead.created", lead));
+
     return NextResponse.json({ lead }, { status: 201 });
   } catch (err) {
     return NextResponse.json(

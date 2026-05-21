@@ -27,11 +27,13 @@ export default function SectorList({ knocker }: Props) {
   const [view, setView] = useState<"list" | "detail" | "draw">("list");
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeStreets, setActiveStreets] = useState<Street[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [todayAssignments, setTodayAssignments] = useState<SectorAssignment[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadSectors = useCallback(async () => {
     setLoading(true);
@@ -76,6 +78,36 @@ export default function SectorList({ knocker }: Props) {
       setDetailLoading(false);
     }
   }, []);
+
+  const handleDelete = useCallback(
+    async (sectorId: string, sectorName: string) => {
+      if (
+        !confirm(
+          `Supprimer le secteur "${sectorName}" ?\n\nToutes les rues et leur progression seront perdues. Cette action est irréversible.`
+        )
+      ) {
+        return;
+      }
+      setDeletingId(sectorId);
+      try {
+        const res = await fetch(`/api/prospection/sectors/${sectorId}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.error || `Erreur ${res.status}`);
+        }
+        setSectors((current) => current.filter((s) => s.id !== sectorId));
+      } catch (err) {
+        alert(
+          `Suppression impossible : ${err instanceof Error ? err.message : "Erreur"}`
+        );
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    []
+  );
 
   const handleCreate = useCallback(
     async (data: { name: string; polygon: LatLng[] }) => {
@@ -305,6 +337,17 @@ export default function SectorList({ knocker }: Props) {
         </div>
       )}
 
+      {/* Search */}
+      {sectors.length > 0 && (
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Rechercher un secteur..."
+          className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+        />
+      )}
+
       {loading ? (
         <div className="text-center py-10 text-gray-400">Chargement...</div>
       ) : sectors.length === 0 ? (
@@ -312,37 +355,70 @@ export default function SectorList({ knocker }: Props) {
           Aucun secteur. Crée-en un pour suivre les rues faites par ton équipe.
         </div>
       ) : (
-        <div className="space-y-2">
-          {sectors.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => openSector(s.id)}
-              className="w-full text-left p-4 bg-white border border-gray-200 rounded-2xl hover:border-gray-300 active:bg-gray-50"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-gray-900">{s.name}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {s.streetIds.length} rues • Par {s.createdByName}
-                  </p>
-                </div>
-                <svg
-                  className="w-5 h-5 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
+        (() => {
+          const q = search.trim().toLowerCase();
+          const visible = q
+            ? sectors.filter((s) => {
+                const blob = `${s.name} ${s.createdByName}`.toLowerCase();
+                return blob.includes(q);
+              })
+            : sectors;
+          if (visible.length === 0) {
+            return (
+              <div className="text-center py-10 text-gray-400 text-sm">
+                Aucun secteur ne correspond à ta recherche.
               </div>
-            </button>
-          ))}
-        </div>
+            );
+          }
+          return (
+            <div className="space-y-2">
+              {visible.map((s) => {
+                const isDeleting = deletingId === s.id;
+                return (
+                  <div
+                    key={s.id}
+                    className="flex items-stretch bg-white border border-gray-200 rounded-2xl overflow-hidden hover:border-gray-300"
+                  >
+                    <button
+                      onClick={() => openSector(s.id)}
+                      className="flex-1 text-left p-4 active:bg-gray-50"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-gray-900">{s.name}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {s.streetIds.length} rues • Par {s.createdByName}
+                          </p>
+                        </div>
+                        <svg
+                          className="w-5 h-5 text-gray-400"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(s.id, s.name)}
+                      disabled={isDeleting}
+                      title="Supprimer ce secteur"
+                      className="px-4 border-l border-gray-100 text-rose-600 hover:bg-rose-50 active:bg-rose-100 disabled:opacity-50"
+                    >
+                      {isDeleting ? "..." : "🗑"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()
       )}
     </div>
   );

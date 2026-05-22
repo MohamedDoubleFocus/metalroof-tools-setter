@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
+import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import { statusColorHex } from "./StatusPills";
 import type { Lead, Sector, Street } from "@/types/prospection";
 
@@ -34,6 +35,7 @@ export default function ProspectionMap({
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const overlaysRef = useRef<google.maps.MVCObject[]>([]);
+  const clustererRef = useRef<MarkerClusterer | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +84,12 @@ export default function ProspectionMap({
       m.setMap?.(null);
     });
     overlaysRef.current = [];
+    // Clear previous cluster (markers it owned are released when setMap=null)
+    if (clustererRef.current) {
+      clustererRef.current.clearMarkers();
+      clustererRef.current.setMap(null);
+      clustererRef.current = null;
+    }
 
     const bounds = new google.maps.LatLngBounds();
     let hasBounds = false;
@@ -123,12 +131,15 @@ export default function ProspectionMap({
       overlaysRef.current.push(line);
     }
 
-    // 3) Lead pins
+    // 3) Lead pins (collected into a MarkerClusterer so stacked pins at the
+    //    same address become a numbered cluster instead of one visually-hidden
+    //    pin on top of another)
+    const leadMarkers: google.maps.Marker[] = [];
     for (const lead of leads) {
       const color = statusColorHex(lead.status);
       const marker = new google.maps.Marker({
         position: { lat: lead.lat, lng: lead.lng },
-        map,
+        // NOTE: don't assign `map` here — the clusterer manages it
         title: `${lead.address}\n${lead.knockerName} — ${lead.status}`,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
@@ -143,9 +154,16 @@ export default function ProspectionMap({
       if (onLeadClick) {
         marker.addListener("click", () => onLeadClick(lead));
       }
-      overlaysRef.current.push(marker);
+      leadMarkers.push(marker);
       bounds.extend({ lat: lead.lat, lng: lead.lng });
       hasBounds = true;
+    }
+
+    if (leadMarkers.length > 0) {
+      clustererRef.current = new MarkerClusterer({
+        map,
+        markers: leadMarkers,
+      });
     }
 
     if (hasBounds) {

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^2.0.2",
+    "@googlemaps/markerclusterer": "^2.6.2",
     "next": "^15.3.1",
     "next-auth": "^4.24.13",
     "p-limit": "^6.2.0",

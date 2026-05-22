@@ -38,6 +38,12 @@ export default function LeadForm({ knockerId, onSubmitted }: Props) {
 
   const needsMeeting = status === "meeting";
   const needsFollowUp = status === "repasser" || status === "suivi";
+  /**
+   * Meeting / repasser / suivi all kick off a follow-up workflow that requires
+   * us to actually reach the person, so the client info becomes mandatory.
+   * For "absent" / "refus" the form stays lightweight (just address + status).
+   */
+  const requireContact = needsMeeting || needsFollowUp;
 
   const reset = useCallback(() => {
     setAddress(null);
@@ -86,6 +92,7 @@ export default function LeadForm({ knockerId, onSubmitted }: Props) {
     status !== null &&
     (!needsMeeting || (meetingDate && meetingTime)) &&
     (!needsFollowUp || (followUpDate && followUpTime)) &&
+    (!requireContact || (clientName.trim() && clientPhone.trim())) &&
     !submitting;
 
   const handleSubmit = useCallback(async () => {
@@ -228,24 +235,47 @@ export default function LeadForm({ knockerId, onSubmitted }: Props) {
 
       {/* 2. INFOS CLIENT */}
       <section>
-        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
-          2. Client
+        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <span>2. Client</span>
+          {requireContact && (
+            <span className="text-[10px] font-bold text-accent normal-case tracking-normal">
+              (obligatoire pour ce statut)
+            </span>
+          )}
         </h3>
         <div className="space-y-3">
           <input
             type="text"
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
-            placeholder="Nom complet du client"
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
+            placeholder={
+              requireContact
+                ? "Nom complet du client *"
+                : "Nom complet du client (optionnel)"
+            }
+            required={requireContact}
+            className={`w-full px-4 py-3 border-2 rounded-xl text-base focus:outline-none ${
+              requireContact && !clientName.trim()
+                ? "border-accent/40 bg-accent/5 focus:border-accent"
+                : "border-gray-200 focus:border-accent"
+            }`}
           />
           <input
             type="tel"
             inputMode="tel"
             value={clientPhone}
             onChange={(e) => setClientPhone(formatPhone(e.target.value))}
-            placeholder="(514) 867-0787"
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
+            placeholder={
+              requireContact
+                ? "(514) 867-0787 *"
+                : "(514) 867-0787 (optionnel)"
+            }
+            required={requireContact}
+            className={`w-full px-4 py-3 border-2 rounded-xl text-base focus:outline-none ${
+              requireContact && !clientPhone.trim()
+                ? "border-accent/40 bg-accent/5 focus:border-accent"
+                : "border-gray-200 focus:border-accent"
+            }`}
           />
         </div>
       </section>

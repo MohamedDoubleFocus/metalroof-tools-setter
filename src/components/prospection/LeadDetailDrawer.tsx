@@ -65,10 +65,21 @@ export default function LeadDetailDrawer({ lead, onChanged, onClose }: Props) {
 
   const needsMeeting = status === "meeting";
   const needsFollowUp = status === "repasser" || status === "suivi";
+  const requireContact = needsMeeting || needsFollowUp;
 
   const handleSave = async () => {
     setSaving(true);
     setError(null);
+
+    // Same rule as the create form: meeting/repasser/suivi need name + phone
+    if (requireContact && (!clientName.trim() || !clientPhone.trim())) {
+      setError(
+        "Le nom complet et le téléphone du client sont obligatoires pour ce statut."
+      );
+      setSaving(false);
+      return;
+    }
+
     try {
       const meetingAt =
         needsMeeting && meetingDate && meetingTime
@@ -237,22 +248,43 @@ export default function LeadDetailDrawer({ lead, onChanged, onClose }: Props) {
 
           {/* Client info */}
           <section className="space-y-2">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Client
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+              <span>Client</span>
+              {requireContact && (
+                <span className="text-[10px] font-bold text-accent normal-case tracking-normal">
+                  (obligatoire pour ce statut)
+                </span>
+              )}
             </h3>
             <input
               type="text"
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
-              placeholder="Nom complet"
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+              placeholder={
+                requireContact ? "Nom complet *" : "Nom complet (optionnel)"
+              }
+              required={requireContact}
+              className={`w-full px-3 py-2.5 border-2 rounded-xl text-sm focus:outline-none ${
+                requireContact && !clientName.trim()
+                  ? "border-accent/40 bg-accent/5 focus:border-accent"
+                  : "border-gray-200 focus:border-accent"
+              }`}
             />
             <input
               type="tel"
               value={clientPhone}
               onChange={(e) => setClientPhone(e.target.value)}
-              placeholder="(514) 867-0787"
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+              placeholder={
+                requireContact
+                  ? "(514) 867-0787 *"
+                  : "(514) 867-0787 (optionnel)"
+              }
+              required={requireContact}
+              className={`w-full px-3 py-2.5 border-2 rounded-xl text-sm focus:outline-none ${
+                requireContact && !clientPhone.trim()
+                  ? "border-accent/40 bg-accent/5 focus:border-accent"
+                  : "border-gray-200 focus:border-accent"
+              }`}
             />
           </section>
 

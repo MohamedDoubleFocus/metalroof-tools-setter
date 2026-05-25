@@ -10,10 +10,14 @@
  */
 
 export const PASS_COOKIE = "mr-pass";
+/** Separate cookie for the white-labeled freelancer portal — must never share
+ * trust with the closer cookie. Different signed payload + different env. */
+export const PORTAL_COOKIE = "rp-pass";
 /** 30 days of validity — internal team doesn't want to re-enter daily. */
 export const PASS_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 /** Constant signed string. Keeps the cookie opaque to brute-forcers. */
 const COOKIE_PAYLOAD = "ok";
+const PORTAL_COOKIE_PAYLOAD = "portal-ok";
 
 /**
  * Returns the HMAC-SHA256 hex digest of `value` keyed by `secret`.
@@ -68,6 +72,29 @@ export async function isCookieValid(
 /** Validate the submitted passcode against the env var. */
 export function isPasscodeCorrect(submitted: string): boolean {
   const expected = process.env.APP_PASSCODE;
+  if (!expected) return false;
+  return constantTimeEqual(submitted, expected);
+}
+
+// ─── Freelancer portal — separate auth surface ───────────────────────────
+
+/** Returns the expected portal cookie value for the current secret. */
+export async function expectedPortalCookieValue(): Promise<string> {
+  return hmacHex(PORTAL_COOKIE_PAYLOAD, getSigningSecret());
+}
+
+/** Check whether a request cookie value matches the freelancer portal token. */
+export async function isPortalCookieValid(
+  cookieValue: string | undefined
+): Promise<boolean> {
+  if (!cookieValue) return false;
+  const expected = await expectedPortalCookieValue();
+  return constantTimeEqual(cookieValue, expected);
+}
+
+/** Validate the submitted freelancer passcode against FREELANCER_PASSCODE. */
+export function isPortalPasscodeCorrect(submitted: string): boolean {
+  const expected = process.env.FREELANCER_PASSCODE;
   if (!expected) return false;
   return constantTimeEqual(submitted, expected);
 }

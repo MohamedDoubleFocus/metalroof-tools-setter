@@ -17,7 +17,14 @@ export default function NavHeader() {
   // never see links to the booking tool, internal simulator, or homepage.
   // Also hide on /prospection because it uses its own mobile-first chrome
   // (top bar + bottom nav) and the global nav would steal vertical space.
-  if (pathname.startsWith("/client") || pathname.startsWith("/prospection")) {
+  // CRITICAL: also hide on the freelancer portal — that side is white-labeled
+  // and must NEVER show Metal Roof Montréal branding.
+  if (
+    pathname.startsWith("/client") ||
+    pathname.startsWith("/prospection") ||
+    pathname.startsWith("/portal") ||
+    pathname === "/portal-locked"
+  ) {
     return null;
   }
 

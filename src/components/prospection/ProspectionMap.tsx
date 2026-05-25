@@ -133,30 +133,55 @@ export default function ProspectionMap({
 
     // 3) Lead pins (collected into a MarkerClusterer so stacked pins at the
     //    same address become a numbered cluster instead of one visually-hidden
-    //    pin on top of another)
-    const leadMarkers: google.maps.Marker[] = [];
+    //    pin on top of another). When pins share identical coordinates (same
+    //    address geocoded to the same point) we spread them in a small circle
+    //    so each one is individually clickable when fully zoomed in.
+    //
+    //    ~0.00007° ≈ 8m at QC latitude — visible at street zoom (≥17) but
+    //    tight enough to still cluster nicely when zoomed out.
+    const SPREAD_RADIUS_DEG = 0.00007;
+    const groups = new Map<string, Lead[]>();
     for (const lead of leads) {
-      const color = statusColorHex(lead.status);
-      const marker = new google.maps.Marker({
-        position: { lat: lead.lat, lng: lead.lng },
-        // NOTE: don't assign `map` here — the clusterer manages it
-        title: `${lead.address}\n${lead.knockerName} — ${lead.status}`,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 10,
-          fillColor: color,
-          fillOpacity: 1,
-          strokeColor: "#FFFFFF",
-          strokeWeight: 2,
-        },
-        clickable: !!onLeadClick,
+      const key = `${lead.lat.toFixed(6)},${lead.lng.toFixed(6)}`;
+      const arr = groups.get(key);
+      if (arr) arr.push(lead);
+      else groups.set(key, [lead]);
+    }
+
+    const leadMarkers: google.maps.Marker[] = [];
+    for (const group of groups.values()) {
+      group.forEach((lead, index) => {
+        let lat = lead.lat;
+        let lng = lead.lng;
+        if (group.length > 1) {
+          // Spread overlapping pins in a circle around the shared point.
+          // Group size > 1 ⇒ each marker gets a small angular offset.
+          const angle = (index / group.length) * Math.PI * 2;
+          lat += SPREAD_RADIUS_DEG * Math.cos(angle);
+          lng += SPREAD_RADIUS_DEG * Math.sin(angle);
+        }
+        const color = statusColorHex(lead.status);
+        const marker = new google.maps.Marker({
+          position: { lat, lng },
+          // NOTE: don't assign `map` here — the clusterer manages it
+          title: `${lead.address}\n${lead.knockerName} — ${lead.status}`,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: color,
+            fillOpacity: 1,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 2,
+          },
+          clickable: !!onLeadClick,
+        });
+        if (onLeadClick) {
+          marker.addListener("click", () => onLeadClick(lead));
+        }
+        leadMarkers.push(marker);
+        bounds.extend({ lat, lng });
+        hasBounds = true;
       });
-      if (onLeadClick) {
-        marker.addListener("click", () => onLeadClick(lead));
-      }
-      leadMarkers.push(marker);
-      bounds.extend({ lat: lead.lat, lng: lead.lng });
-      hasBounds = true;
     }
 
     if (leadMarkers.length > 0) {

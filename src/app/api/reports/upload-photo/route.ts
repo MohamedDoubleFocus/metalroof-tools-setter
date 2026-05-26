@@ -1,88 +1,72 @@
-import { NextRequest, NextResponse } from "next/server";
-import { uploadReferencePhoto } from "@/lib/reports/blob";
+import { NextResponse } from "next/server";
+import {
+  handleUpload,
+  type HandleUploadBody,
+} from "@vercel/blob/client";
 import { detectContext } from "@/lib/reports/context";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
 
 /**
- * POST /api/reports/upload-photo
+ * POST /api/reports/upload-photo  (closer-only)
  *
- * Closer-only. Takes a single image file, uploads it to Vercel Blob,
- * and returns the public URL. The closer then includes the URL in the
- * order's `referencePhotos` array when calling POST /api/reports.
+ * Client-upload protocol: the browser uploads reference photos DIRECTLY to
+ * Vercel Blob via `upload()` from `@vercel/blob/client`. This endpoint only
+ * grants the upload token — large drone shots or hi-res phone photos bypass
+ * Vercel's 4.5 MB function body limit entirely.
  *
- * Form data:
- *   file: File (image/*)
- *   orderId?: string  (used in the Blob pathname for organisation)
- *   index?: number    (used in the Blob pathname for organisation)
+ * Use:
+ *   await upload(file.name, file, {
+ *     access: "public",
+ *     handleUploadUrl: "/api/reports/upload-photo",
+ *     clientPayload: JSON.stringify({ orderId, index }),
+ *   })
+ *
+ * `clientPayload` is optional — when present we use it to organise the Blob
+ * pathname per order/index. Otherwise we file the photo under "draft".
  */
-export async function POST(request: NextRequest) {
-  const ctx = await detectContext();
-  if (ctx !== "closer") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-  }
-
-  let formData: FormData;
+export async function POST(request: Request) {
+  let body: HandleUploadBody;
   try {
-    formData = await request.formData();
+    body = (await request.json()) as HandleUploadBody;
   } catch {
     return NextResponse.json(
-      { error: "Form data invalide" },
+      { error: "Body JSON invalide" },
       { status: 400 }
     );
   }
-
-  const file = formData.get("file") as File | null;
-  if (!file) {
-    return NextResponse.json(
-      { error: "Aucun fichier fourni" },
-      { status: 400 }
-    );
-  }
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json(
-      { error: "Le fichier doit être une image" },
-      { status: 400 }
-    );
-  }
-  if (file.size > 15 * 1024 * 1024) {
-    return NextResponse.json(
-      { error: "L'image ne doit pas dépasser 15 Mo" },
-      { status: 400 }
-    );
-  }
-
-  const orderIdRaw = formData.get("orderId");
-  const indexRaw = formData.get("index");
-  const orderId =
-    typeof orderIdRaw === "string" && orderIdRaw.length > 0
-      ? orderIdRaw
-      : "draft";
-  const index =
-    typeof indexRaw === "string" && /^\d+$/.test(indexRaw)
-      ? parseInt(indexRaw, 10)
-      : 0;
 
   try {
-    const arrayBuffer = await file.arrayBuffer();
-    const url = await uploadReferencePhoto(
-      Buffer.from(arrayBuffer),
-      orderId,
-      index,
-      file.name
-    );
-    return NextResponse.json({ url });
-  } catch (err) {
-    console.error("[reports/upload-photo]", err);
-    return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : "Erreur lors du téléchargement",
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (_pathname, clientPayload) => {
+        const ctx = await detectContext();
+        if (ctx !== "closer") {
+          throw new Error("Non autorisé");
+        }
+        // clientPayload is optional but we accept { orderId, index }
+        return {
+          allowedContentTypes: ["image/jpeg", "image/png", "image/webp"],
+          maximumSizeInBytes: 25 * 1024 * 1024, // 25 MB
+          addRandomSuffix: true,
+          tokenPayload: clientPayload ?? null,
+        };
       },
-      { status: 500 }
+      onUploadCompleted: async ({ blob }) => {
+        // No server-side bookkeeping needed — the closer's form receives the
+        // resulting URL from `upload()` directly and POSTs it back with the
+        // order creation.
+        console.log("[upload-photo] uploaded", blob.url);
+      },
+    });
+
+    return NextResponse.json(jsonResponse);
+  } catch (err) {
+    console.error("[upload-photo]", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Erreur" },
+      { status: 400 }
     );
   }
 }

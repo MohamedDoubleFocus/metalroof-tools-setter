@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import {
   createReportOrder,
   listAllReportOrders,
   listReportOrdersByStatus,
 } from "@/lib/reports/kv";
 import { detectContext } from "@/lib/reports/context";
+import { fireReportCreatedWebhook } from "@/lib/reports/make-webhook";
 import { redactForFreelancer } from "@/types/reports";
 import type {
   CreateReportOrderInput,
@@ -77,13 +79,9 @@ export async function POST(request: NextRequest) {
   if (!address) {
     return NextResponse.json({ error: "address requis" }, { status: 400 });
   }
-  const closerLabel = (body.closerLabel || "").trim();
-  if (!closerLabel) {
-    return NextResponse.json(
-      { error: "closerLabel requis (identifiant interne du client)" },
-      { status: 400 }
-    );
-  }
+  // closerLabel is now optional — we use the address as a fallback so the
+  // order list still has a recognizable title.
+  const closerLabel = (body.closerLabel || "").trim() || address;
 
   const referencePhotos = Array.isArray(body.referencePhotos)
     ? body.referencePhotos.filter(
@@ -102,6 +100,11 @@ export async function POST(request: NextRequest) {
       notes: body.notes,
       referencePhotos,
     });
+
+    // Notify the freelancer in the background via Make.com so the closer's
+    // response is not blocked on a slow third-party.
+    after(() => fireReportCreatedWebhook(order));
+
     return NextResponse.json({ order }, { status: 201 });
   } catch (err) {
     return NextResponse.json(

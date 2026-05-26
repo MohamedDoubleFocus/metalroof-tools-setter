@@ -193,19 +193,40 @@ export default function ReportDetailPage() {
 
       {/* PDF section */}
       {order.status === "ready" || order.status === "delivered" ? (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
-          <h3 className="text-sm font-bold text-emerald-900 mb-2">
-            📄 Rapport prêt
-          </h3>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="text-sm font-bold text-emerald-900">
+              📄 Rapport prêt
+            </h3>
+            {order.pdfUrl && (
+              <div className="flex items-center gap-2">
+                <a
+                  href={order.pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold hover:bg-emerald-100"
+                >
+                  ↗ Ouvrir
+                </a>
+                <a
+                  href={order.pdfUrl}
+                  download
+                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent-light"
+                >
+                  ⤓ Télécharger
+                </a>
+              </div>
+            )}
+          </div>
+
           {order.pdfUrl && (
-            <a
-              href={order.pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block px-5 py-2.5 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent-light"
-            >
-              Télécharger le PDF
-            </a>
+            <div className="rounded-xl overflow-hidden border border-emerald-200 bg-white">
+              <iframe
+                src={`${order.pdfUrl}#toolbar=1&navpanes=0`}
+                title="Aperçu du rapport"
+                className="w-full h-[800px]"
+              />
+            </div>
           )}
           {order.status === "ready" && (
             <button

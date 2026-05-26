@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 
 interface Props {
   orderId: string;
@@ -21,20 +22,17 @@ export default function FreelancerUploadForm({ orderId, onUploaded }: Props) {
     setUploading(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("orderId", orderId);
-      const res = await fetch("/api/reports/upload-pdf", {
-        method: "POST",
-        body: fd,
+      // Direct browser-to-Blob upload — bypasses Vercel's 4.5 MB function
+      // body limit. The server only signs the upload token and reacts to
+      // completion via the onUploadCompleted callback in
+      // /api/reports/upload-pdf.
+      await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/reports/upload-pdf",
+        clientPayload: JSON.stringify({ orderId }),
       });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
       setSuccess(true);
       onUploaded?.();
-      // Refresh server data so the status flips visually
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");

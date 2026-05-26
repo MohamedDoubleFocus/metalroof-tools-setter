@@ -1,114 +1,108 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import {
+  handleUpload,
+  type HandleUploadBody,
+} from "@vercel/blob/client";
 import { after } from "next/server";
-import { uploadReportPdf } from "@/lib/reports/blob";
-import { attachReportPdf, getReportOrder } from "@/lib/reports/kv";
+import {
+  attachReportPdf,
+  getReportOrder,
+} from "@/lib/reports/kv";
 import { fireReportReadyWebhook } from "@/lib/reports/make-webhook";
 import { detectContext } from "@/lib/reports/context";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
 
 /**
- * POST /api/reports/upload-pdf
+ * POST /api/reports/upload-pdf  (freelancer-only)
  *
- * Freelancer-only. Uploads the completed PDF to Vercel Blob, attaches the
- * URL to the order (status → "ready"), and fires the Make.com webhook so
- * the closer is notified.
+ * Implements Vercel Blob's client-upload protocol:
+ *   1. Browser asks this endpoint for a one-time upload token.
+ *   2. Browser uploads the PDF DIRECTLY to Blob (bypassing this function
+ *      entirely — no Vercel body-size limit, no HTTP 413).
+ *   3. Blob calls back into this endpoint via `onUploadCompleted`, at which
+ *      point we attach the resulting URL to the order and ping Make.
  *
- * Form data:
- *   file: File (application/pdf)
- *   orderId: string
+ * Use @vercel/blob/client's `upload()` on the client side and pass
+ *   handleUploadUrl: "/api/reports/upload-pdf"
+ *   clientPayload: JSON.stringify({ orderId })
  */
-export async function POST(request: NextRequest) {
-  const ctx = await detectContext();
-  if (ctx !== "freelancer") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-  }
-
-  let formData: FormData;
+export async function POST(request: Request) {
+  let body: HandleUploadBody;
   try {
-    formData = await request.formData();
+    body = (await request.json()) as HandleUploadBody;
   } catch {
     return NextResponse.json(
-      { error: "Form data invalide" },
+      { error: "Body JSON invalide" },
       { status: 400 }
     );
   }
 
-  const file = formData.get("file") as File | null;
-  const orderIdRaw = formData.get("orderId");
-  const orderId = typeof orderIdRaw === "string" ? orderIdRaw.trim() : "";
-
-  if (!file) {
-    return NextResponse.json(
-      { error: "Aucun fichier fourni" },
-      { status: 400 }
-    );
-  }
-  if (!orderId) {
-    return NextResponse.json({ error: "orderId requis" }, { status: 400 });
-  }
-  if (
-    file.type !== "application/pdf" &&
-    !file.name.toLowerCase().endsWith(".pdf")
-  ) {
-    return NextResponse.json(
-      { error: "Le fichier doit être un PDF" },
-      { status: 400 }
-    );
-  }
-  if (file.size > 30 * 1024 * 1024) {
-    return NextResponse.json(
-      { error: "Le PDF ne doit pas dépasser 30 Mo" },
-      { status: 400 }
-    );
-  }
-
-  // Verify the order exists before uploading anything
-  const existing = await getReportOrder(orderId);
-  if (!existing) {
-    return NextResponse.json(
-      { error: "Commande introuvable" },
-      { status: 404 }
-    );
-  }
-
-  let pdfUrl: string;
   try {
-    const arrayBuffer = await file.arrayBuffer();
-    pdfUrl = await uploadReportPdf(
-      Buffer.from(arrayBuffer),
-      orderId,
-      file.name
-    );
-  } catch (err) {
-    console.error("[reports/upload-pdf] blob upload failed:", err);
-    return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : "Erreur lors du téléchargement",
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (_pathname, clientPayload) => {
+        // Defense-in-depth: middleware already gates the route to the freelancer
+        // domain, but verify again here.
+        const ctx = await detectContext();
+        if (ctx !== "freelancer") {
+          throw new Error("Non autorisé");
+        }
+
+        if (!clientPayload) {
+          throw new Error("clientPayload requis (orderId)");
+        }
+        let parsed: { orderId?: string };
+        try {
+          parsed = JSON.parse(clientPayload);
+        } catch {
+          throw new Error("clientPayload invalide");
+        }
+        const orderId = parsed.orderId?.trim();
+        if (!orderId) throw new Error("orderId requis");
+
+        const order = await getReportOrder(orderId);
+        if (!order) throw new Error("Commande introuvable");
+
+        return {
+          allowedContentTypes: ["application/pdf"],
+          maximumSizeInBytes: 50 * 1024 * 1024, // 50 MB
+          addRandomSuffix: true,
+          tokenPayload: JSON.stringify({ orderId }),
+        };
       },
-      { status: 500 }
-    );
-  }
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        // Server-side callback fired by Vercel Blob once the client finished
+        // uploading. We use it to atomically attach the PDF + notify Make.
+        if (!tokenPayload) return;
+        let payload: { orderId?: string };
+        try {
+          payload = JSON.parse(tokenPayload);
+        } catch {
+          console.error("[upload-pdf] invalid tokenPayload");
+          return;
+        }
+        const orderId = payload.orderId;
+        if (!orderId) return;
 
-  const updated = await attachReportPdf(orderId, pdfUrl);
-  if (!updated) {
+        const updated = await attachReportPdf(orderId, blob.url);
+        if (!updated) {
+          console.error("[upload-pdf] order vanished between token and upload", orderId);
+          return;
+        }
+
+        // Fire-and-forget Make webhook so the closer is notified
+        after(() => fireReportReadyWebhook(updated));
+      },
+    });
+
+    return NextResponse.json(jsonResponse);
+  } catch (err) {
+    console.error("[upload-pdf]", err);
     return NextResponse.json(
-      { error: "Commande introuvable après upload" },
-      { status: 500 }
+      { error: err instanceof Error ? err.message : "Erreur" },
+      { status: 400 }
     );
   }
-
-  // Notify the closer side via Make in the background — never block the
-  // freelancer's submit on a slow third-party.
-  after(() => fireReportReadyWebhook(updated));
-
-  return NextResponse.json({
-    success: true,
-    pdfUrl,
-    orderId,
-  });
 }

@@ -46,6 +46,12 @@ const ALWAYS_PUBLIC_PREFIXES = [
   "/api/internal/",
   "/api/upload",
   "/api/pdf",
+  // Vercel Blob makes server-to-server callbacks to these endpoints without
+  // any cookie — they have to be reachable on both domains. Auth is enforced
+  // INSIDE the handlers via `detectContext()` + `handleUpload`'s built-in
+  // signature validation for upload-completed callbacks.
+  "/api/reports/upload-pdf",
+  "/api/reports/upload-photo",
 ];
 
 function startsWithAny(pathname: string, prefixes: string[]): boolean {

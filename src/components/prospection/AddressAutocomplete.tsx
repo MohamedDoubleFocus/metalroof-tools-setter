@@ -33,6 +33,24 @@ interface Props {
 let googleLoaded = false;
 let googleLoading: Promise<typeof google.maps> | null = null;
 
+/**
+ * Ensure a Google-formatted address starts with the user's chosen civic
+ * number. Google's `formatted_address` sometimes omits the civic (when the
+ * autocomplete pick was at street-level) or contains a different one (when
+ * the user typed a custom civic after picking). This normalises both cases.
+ */
+function buildFormattedWithCivic(
+  rawFormatted: string | undefined,
+  civic: string
+): string | undefined {
+  if (!rawFormatted) return undefined;
+  if (!civic.trim()) return rawFormatted;
+  // Strip any existing leading civic number (handles "2800 Rue X..." and
+  // "2800-2802 Rue X..." forms).
+  const withoutCivic = rawFormatted.replace(/^\d+(?:-\d+)?\s+/, "");
+  return `${civic.trim()} ${withoutCivic}`;
+}
+
 async function loadGoogleMaps(): Promise<typeof google.maps> {
   if (googleLoaded && typeof google !== "undefined") return google.maps;
   if (googleLoading) return googleLoading;
@@ -131,9 +149,15 @@ export default function AddressAutocomplete({
 
           // Strip trailing ", Canada" for cleaner display — every address
           // we handle is already Canadian (autocomplete restricted to "ca").
-          const formattedAddress = place.formatted_address
+          const rawFormatted = place.formatted_address
             ? place.formatted_address.replace(/,\s*Canada$/i, "")
             : undefined;
+          // Normalise the civic — Google's formatted_address sometimes
+          // doesn't include one when the user picked a street-level result.
+          const formattedAddress = buildFormattedWithCivic(
+            rawFormatted,
+            finalHouse
+          );
 
           onChangeRef.current({
             address:
@@ -173,6 +197,10 @@ export default function AddressAutocomplete({
           address: val
             ? `${val} ${value.streetName}`.trim()
             : value.streetName,
+          // Re-normalise the formatted address so the manually-typed civic
+          // becomes part of it (otherwise downstream consumers — like the
+          // reports module — would persist the address WITHOUT the civic).
+          formattedAddress: buildFormattedWithCivic(value.formattedAddress, val),
         });
       }
     },

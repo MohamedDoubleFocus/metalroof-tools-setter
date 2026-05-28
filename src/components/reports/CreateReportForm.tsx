@@ -29,11 +29,14 @@ export default function CreateReportForm() {
     setSubmitting(true);
     setError(null);
     try {
+      // Prefer the full Google-formatted address (with city/province/postal
+      // code) so the freelancer gets enough context to produce the report.
+      const fullAddress = address.formattedAddress || address.address;
       const res = await fetch("/api/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          address: address.address,
+          address: fullAddress,
           lat: address.lat,
           lng: address.lng,
           notes: notes.trim() || undefined,

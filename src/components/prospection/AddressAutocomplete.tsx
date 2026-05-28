@@ -4,7 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 
 export interface AddressValue {
-  address: string; // formatted full address
+  address: string; // short address: "<houseNumber> <streetName>" (e.g. "2800 Rue Saint-Denis")
+  /**
+   * Full Google-formatted address with city + province + postal code, e.g.
+   * "2800 Rue Saint-Denis, Montréal, QC H2X 3K8". Optional because manual
+   * entry (no autocomplete pick) can't produce it.
+   */
+  formattedAddress?: string;
   streetName: string; // route component
   houseNumber: string;
   lat: number;
@@ -123,11 +129,18 @@ export default function AddressAutocomplete({
             setHouseInput(streetNumber);
           }
 
+          // Strip trailing ", Canada" for cleaner display — every address
+          // we handle is already Canadian (autocomplete restricted to "ca").
+          const formattedAddress = place.formatted_address
+            ? place.formatted_address.replace(/,\s*Canada$/i, "")
+            : undefined;
+
           onChangeRef.current({
             address:
               finalHouse && route
                 ? `${finalHouse} ${route}`
                 : (place.formatted_address ?? route),
+            formattedAddress,
             streetName: route,
             houseNumber: finalHouse,
             lat,

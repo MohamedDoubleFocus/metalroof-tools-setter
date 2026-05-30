@@ -69,42 +69,56 @@ export function getShingleTilePrompt(color: ColorDefinition, customInstructions?
   const colorLine = getColorLine(color);
   const customBlock = getCustomInstructionsBlock(customInstructions);
 
-  return `Replace ONLY the main roof covering material on this house. The output roof area must equal the input roof area exactly — no more, no less.
+  const spec = {
+    task: {
+      action: "Replace ONLY the main roof covering material",
+      critical: "Output roof area MUST equal input roof area exactly",
+    },
+    rules: {
+      must: [
+        "Cover 100% of original roof surface",
+        "Match exact roof boundaries pixel-level",
+        "Keep all roof sections — if original has N sections, output has N",
+      ],
+      never: [
+        "Add roofing to walls or facades",
+        "Extend roof beyond original edges",
+        "Omit any visible roof section",
+        "Merge or split roof sections",
+        "Touch porches, garages, awnings, carports, secondary roofs",
+        "Modify windows, doors, gutters, soffits, trim",
+        "Recolor or tint gutters or soffits to match the new roof color",
+      ],
+    },
+    preserve: {
+      locked: [
+        "House structure",
+        "Roof geometry, shape, pitch, angles",
+        "Ridges, hips, valleys, overhangs",
+        "Gutters — keep exact original color, do not tint",
+        "Soffits — keep exact original color, do not tint",
+        "Fascia, trim, walls, siding, brick, stone",
+        "Windows, doors, garage doors, shutters",
+        "Environment, vegetation, sky, lighting, shadows, season",
+      ],
+    },
+    new_roof: {
+      type: "European wave tile metal roof",
+      material: "steel with baked enamel coating",
+      finish: "semi-gloss metallic",
+      profile: "S-curve wave pattern, discrete tile units arranged in horizontal rows",
+      texture: "wave rows running along the roof slope, rows offset half-a-tile (brick pattern) so each row's tiles sit centered between the tiles in the row above",
+      shadows: "pronounced dark shadow line where each row meets the row below (caused by the overlapping lip of each tile)",
+      color: colorLine,
+    },
+    output: {
+      quality: "photorealistic",
+      geometry: "original roof boundaries locked",
+      validation: "PASS only if (a) roof area identical to input, (b) gutters and soffits unchanged from input, (c) new roof color matches the color specification exactly, (d) nothing outside the roof is modified",
+    },
+  };
 
-Cover 100% of the original roof surface. Match the exact roof boundaries at pixel level. If the original has multiple roof sections, keep every single one — do not merge, split, add, or omit any section.
-
-Apply a traditional European Mediterranean-style stamped metal scalloped tile roof — the classic "tuile écaille" / French-Spanish-Italian fish-scale / beaver-tail tile look from villas in Provence, Tuscany, and rural Spain, executed in pressed steel panels (similar to Permanent Roof, Roser, or Tilcor stamped metal tile systems). The roof is made of long horizontal pressed-steel panels stamped with multiple individual tile units per panel — but the final visual must read as discrete tiles, not as panels.
-
-KEY VISUAL DETAILS — critical for matching the reference style:
-
-- TILE SHAPE: Each individual tile is roughly square-to-slightly-rectangular, with a softly rounded HALF-CIRCLE SCALLOPED BOTTOM EDGE (fish-scale / beaver-tail silhouette), and a clearly visible CONVEX 3D DOME across the tile face — moderate doming, more than a subtle pillow but less than a deep barrel ridge. Each tile catches light on its convex top and shows a gentle shaded valley near its sides.
-
-- DEEP CRISP SHADOW GROOVES — most important: there must be PRONOUNCED, SHARP, DARK SHADOW LINES around every tile. Strong vertical dark grooves separate adjacent tiles within a row. Strong horizontal dark shadow lines run where each row's tiles meet the row below — caused by a real, visible OVERLAPPING LIP at the bottom of each tile that physically protrudes outward and casts a crisp, dark, sharp horizontal shadow line on the row below. These shadow lines are deep and well-defined (not soft or subtle) — they are what gives the roof its characteristic crisp, three-dimensional, hand-laid clay-tile appearance. The shadow grooves should read as nearly black against the tile color.
-
-- ROW PATTERN: Tiles are arranged in horizontal rows parallel to the eave, with rows STAGGERED / OFFSET BY HALF A TILE (brick / running-bond pattern) so the rounded bottom of each tile sits centered between the rounded bottoms of the two tiles in the row above. This creates the characteristic wavy scalloped horizontal banding when viewed from a distance.
-
-- FINISH: low-sheen MATTE to semi-matte metallic baked enamel — uniform, with very slight textured/granular surface (like fine matte powder coat), and realistic specular highlights only where direct sun catches the gentle curvature of each dome. Never glossy, never plasticky, never reflective like sheet metal.
-
-- SCALE: moderate residential tile scale — the size of traditional European clay tiles, not oversized industrial panels. ${colorLine}
-
-CRITICAL COLOR LOCK — The NEW roof color applies EXCLUSIVELY to the roof slopes/panels. It must NEVER bleed onto any other element.
-
-The following elements MUST keep their ORIGINAL color, material, texture, and finish from the input photo — pixel identical, unchanged:
-- Gutters (eavestroughs) — keep the exact original color they have in the input photo, do not tint, do not recolor, do not match to the new roof color
-- Soffits (under-eave panels) — keep the exact original color they have in the input photo, do not tint, do not recolor, do not match to the new roof color
-- Fascia boards and trim — keep original color unchanged
-- Walls, siding, brick, stone, facades — keep original color unchanged
-- Windows, doors, garage doors, shutters — keep original color unchanged
-- Porches, decks, railings, columns, awnings, carports — keep original color unchanged
-- Any secondary small roofs over porches or bay windows if they are not the main roof — keep original unchanged
-
-Do NOT propagate, reflect, echo, or coordinate the new roof color onto gutters or soffits. Gutters and soffits are OFF-LIMITS — treat them as a protected mask.
-
-Do not add roofing material to any surface that is not already a roof. Do not extend the roof beyond its original edges.
-
-Keep the full house structure unchanged. Keep the roof geometry, shape, pitch, angles, ridges, hips, valleys, and overhangs identical. Keep the environment, vegetation, sky, lighting, shadows, and season exactly as they are in the original photo.${customBlock}
-
-The result must be photorealistic. The original roof boundaries must remain locked. The image passes validation only if the roof area is identical to the original, gutters and soffits have the exact same color as the input (unless explicitly overridden by the custom instructions above), and absolutely nothing else has changed.`;
+  return `${JSON.stringify(spec, null, 2)}${customBlock}`;
 }
 
 export function getStandingSeamPrompt(color: ColorDefinition, customInstructions?: string): string {

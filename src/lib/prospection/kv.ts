@@ -172,6 +172,7 @@ export async function createSector(
     id,
     name: input.name,
     polygon: input.polygon,
+    notes: input.notes?.trim() || undefined,
     createdAt: now,
     createdBy: input.knockerId,
     createdByName: getKnockerName(input.knockerId),
@@ -180,6 +181,32 @@ export async function createSector(
   await setJsonPersistent(sectorKey(id), sector);
   await pushToList(sectorsAllKey(), id);
   return sector;
+}
+
+/**
+ * Patch a sector — currently used to edit the free-form notes field
+ * (and the name, if we want to surface that later).
+ */
+export async function updateSector(
+  id: string,
+  patch: { name?: string; notes?: string | null }
+): Promise<Sector | null> {
+  const existing = await getSector(id);
+  if (!existing) return null;
+
+  const updated: Sector = {
+    ...existing,
+    name: patch.name?.trim() || existing.name,
+    notes:
+      patch.notes === null
+        ? undefined
+        : patch.notes !== undefined
+          ? patch.notes.trim() || undefined
+          : existing.notes,
+    updatedAt: Date.now(),
+  };
+  await setJsonPersistent(sectorKey(id), updated);
+  return updated;
 }
 
 export async function getSector(id: string): Promise<Sector | null> {

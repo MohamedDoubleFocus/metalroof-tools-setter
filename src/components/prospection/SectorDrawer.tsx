@@ -5,7 +5,11 @@ import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import type { LatLng } from "@/types/prospection";
 
 interface Props {
-  onSave: (data: { name: string; polygon: LatLng[] }) => Promise<void> | void;
+  onSave: (data: {
+    name: string;
+    polygon: LatLng[];
+    notes?: string;
+  }) => Promise<void> | void;
   onCancel?: () => void;
   initialCenter?: LatLng;
 }
@@ -30,6 +34,7 @@ export default function SectorDrawer({
   const placesAutoRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [polygonCoords, setPolygonCoords] = useState<LatLng[] | null>(null);
   const [name, setName] = useState("");
+  const [notes, setNotes] = useState("");
   const [searchValue, setSearchValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,7 +177,11 @@ export default function SectorDrawer({
     setSaving(true);
     setError(null);
     try {
-      await onSave({ name: name.trim(), polygon: polygonCoords });
+      await onSave({
+        name: name.trim(),
+        polygon: polygonCoords,
+        notes: notes.trim() || undefined,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur sauvegarde");
       setSaving(false);
@@ -195,6 +204,15 @@ export default function SectorDrawer({
         onChange={(e) => setName(e.target.value)}
         placeholder="Nom du secteur (ex: Saint-Lambert Centre)"
         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
+      />
+
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        rows={2}
+        maxLength={1000}
+        placeholder="Notes pour le secteur (optionnel) — ex: quartier aisé, beaucoup de duplex, repasser le samedi matin…"
+        className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none resize-y"
       />
 
       {/* Quick address search — recentres the map so you can build sectors

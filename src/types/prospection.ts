@@ -45,7 +45,10 @@ export interface Sector {
   id: string;
   name: string;
   polygon: LatLng[];
+  /** Free-form notes for the sector — context, demographics, follow-up info, etc. */
+  notes?: string;
   createdAt: number;
+  updatedAt?: number; // populated whenever notes / name / etc. change after creation
   createdBy: string; // knockerId
   createdByName: string;
   streetIds: string[]; // normalized street names within this sector
@@ -111,6 +114,12 @@ export interface CreateSectorInput {
   name: string;
   polygon: LatLng[];
   knockerId: string;
+  notes?: string;
+}
+
+export interface UpdateSectorInput {
+  name?: string;
+  notes?: string | null; // null clears the field
 }
 
 export interface CreateAssignmentInput {

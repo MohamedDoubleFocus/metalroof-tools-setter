@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
       name: body.name,
       polygon: body.polygon as LatLng[],
       knockerId: body.knockerId,
+      notes: body.notes,
     });
 
     // 2. Query Overpass API

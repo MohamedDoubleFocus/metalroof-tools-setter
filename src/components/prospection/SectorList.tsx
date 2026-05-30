@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import SectorDrawer from "./SectorDrawer";
 import ProspectionMap from "./ProspectionMap";
 import AssignmentPanel from "./AssignmentPanel";
+import SectorNotesPanel from "./SectorNotesPanel";
 import { todayDateKey } from "@/lib/prospection/utils";
 import type {
   Sector,
@@ -110,7 +111,7 @@ export default function SectorList({ knocker }: Props) {
   );
 
   const handleCreate = useCallback(
-    async (data: { name: string; polygon: LatLng[] }) => {
+    async (data: { name: string; polygon: LatLng[]; notes?: string }) => {
       const res = await fetch("/api/prospection/sectors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -133,6 +134,39 @@ export default function SectorList({ knocker }: Props) {
       }
     },
     [knocker.id, loadSectors, openSector]
+  );
+
+  /** Save edited notes on an existing sector. */
+  const saveSectorNotes = useCallback(
+    async (sectorId: string, notes: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/prospection/sectors/${sectorId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notes }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.error || `HTTP ${res.status}`);
+        }
+        const d = await res.json();
+        // Patch the cached sector list with the new notes
+        setSectors((current) =>
+          current.map((s) =>
+            s.id === sectorId
+              ? { ...s, notes: d.sector?.notes, updatedAt: d.sector?.updatedAt }
+              : s
+          )
+        );
+        return true;
+      } catch (err) {
+        alert(
+          `Mise à jour impossible : ${err instanceof Error ? err.message : "Erreur"}`
+        );
+        return false;
+      }
+    },
+    []
   );
 
   const toggleStreetDone = useCallback(
@@ -206,6 +240,14 @@ export default function SectorList({ knocker }: Props) {
               {done}/{total} rues faites • Créé par {sector.createdByName}
             </p>
           </div>
+        )}
+
+        {sector && (
+          <SectorNotesPanel
+            sectorId={sector.id}
+            initialNotes={sector.notes}
+            onSave={saveSectorNotes}
+          />
         )}
 
         {detailLoading ? (
@@ -385,7 +427,17 @@ export default function SectorList({ knocker }: Props) {
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-bold text-gray-900">{s.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-bold text-gray-900">{s.name}</p>
+                            {s.notes?.trim() && (
+                              <span
+                                title="Ce secteur a des notes"
+                                className="text-xs"
+                              >
+                                📝
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500 mt-1">
                             {s.streetIds.length} rues • Par {s.createdByName}
                           </p>

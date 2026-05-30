@@ -3,7 +3,9 @@ import {
   getSector,
   listStreetsForSector,
   deleteSector,
+  updateSector,
 } from "@/lib/prospection/kv";
+import type { UpdateSectorInput } from "@/types/prospection";
 
 export const runtime = "nodejs";
 
@@ -25,6 +27,36 @@ export async function GET(
   }
   const streets = await listStreetsForSector(id);
   return NextResponse.json({ sector, streets });
+}
+
+/**
+ * PATCH /api/prospection/sectors/[id]
+ * Updates the editable sector fields (notes, name).
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  let body: Partial<UpdateSectorInput>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Body JSON invalide" }, { status: 400 });
+  }
+
+  const updated = await updateSector(id, {
+    name: body.name,
+    notes: body.notes,
+  });
+  if (!updated) {
+    return NextResponse.json(
+      { error: "Secteur introuvable" },
+      { status: 404 }
+    );
+  }
+  return NextResponse.json({ sector: updated });
 }
 
 export async function DELETE(

@@ -18,6 +18,8 @@ import GenerateButton from "@/components/GenerateButton";
 import ProgressPanel from "@/components/ProgressPanel";
 import ResultsGallery from "@/components/ResultsGallery";
 import DownloadButton from "@/components/DownloadButton";
+import SimulationHistory from "@/components/SimulationHistory";
+import Link from "next/link";
 
 const initialState: AppState = {
   step: "input_mode",
@@ -675,72 +677,87 @@ export default function RoofSimulator() {
     (t) => t.status === "success" && t.taskType === "roof"
   ).length;
 
+  // Shared builder for both download + email send — same payload shape used by
+  // /api/pdf and /api/pdf/send-email.
+  const buildPdfPayload = useCallback(() => {
+    const buildSideResults = (side: "front" | "back") => {
+      const colorResults: Record<
+        string,
+        {
+          waveTileUrl?: string;
+          standingSeamUrl?: string;
+          shingleTileUrl?: string;
+        }
+      > = {};
+      for (const task of state.tasks) {
+        if (
+          task.taskType !== "roof" ||
+          task.side !== side ||
+          task.status !== "success" ||
+          !task.resultUrl
+        )
+          continue;
+        if (!colorResults[task.colorKey]) colorResults[task.colorKey] = {};
+        if (task.roofStyle === "wave_tile") {
+          colorResults[task.colorKey].waveTileUrl = task.resultUrl;
+        } else if (task.roofStyle === "standing_seam") {
+          colorResults[task.colorKey].standingSeamUrl = task.resultUrl;
+        } else {
+          colorResults[task.colorKey].shingleTileUrl = task.resultUrl;
+        }
+      }
+      return Object.entries(colorResults)
+        .filter(
+          ([, v]) => v.waveTileUrl || v.standingSeamUrl || v.shingleTileUrl
+        )
+        .map(([colorKey, v]) => ({
+          colorKey,
+          waveTileUrl: v.waveTileUrl,
+          standingSeamUrl: v.standingSeamUrl,
+          shingleTileUrl: v.shingleTileUrl,
+        }));
+    };
+
+    const frontResults = buildSideResults("front");
+    const backResults = state.hasBackPhoto ? buildSideResults("back") : [];
+
+    if (frontResults.length === 0 && backResults.length === 0) {
+      throw new Error("Aucune image reussie a inclure dans le PDF");
+    }
+
+    const frontOriginalUrl =
+      state.enhancedImageUrl || state.uploadedImageUrl;
+    const backOriginalUrl = state.hasBackPhoto
+      ? state.backEnhancedImageUrl || state.backUploadedImageUrl
+      : null;
+
+    return {
+      originalImageUrl: frontOriginalUrl,
+      results: frontResults,
+      backOriginalImageUrl: backOriginalUrl,
+      backResults,
+      clientName: state.clientName || undefined,
+    };
+  }, [
+    state.tasks,
+    state.uploadedImageUrl,
+    state.enhancedImageUrl,
+    state.hasBackPhoto,
+    state.backUploadedImageUrl,
+    state.backEnhancedImageUrl,
+    state.clientName,
+  ]);
+
   const handleDownloadPdf = useCallback(async () => {
     dispatch({ type: "SET_PDF_LOADING", loading: true });
 
     try {
-      // Build per-side color results
-      const buildSideResults = (side: "front" | "back") => {
-        const colorResults: Record<
-          string,
-          {
-            waveTileUrl?: string;
-            standingSeamUrl?: string;
-            shingleTileUrl?: string;
-          }
-        > = {};
-        for (const task of state.tasks) {
-          if (
-            task.taskType !== "roof" ||
-            task.side !== side ||
-            task.status !== "success" ||
-            !task.resultUrl
-          )
-            continue;
-          if (!colorResults[task.colorKey]) colorResults[task.colorKey] = {};
-          if (task.roofStyle === "wave_tile") {
-            colorResults[task.colorKey].waveTileUrl = task.resultUrl;
-          } else if (task.roofStyle === "standing_seam") {
-            colorResults[task.colorKey].standingSeamUrl = task.resultUrl;
-          } else {
-            colorResults[task.colorKey].shingleTileUrl = task.resultUrl;
-          }
-        }
-        return Object.entries(colorResults)
-          .filter(
-            ([, v]) => v.waveTileUrl || v.standingSeamUrl || v.shingleTileUrl
-          )
-          .map(([colorKey, v]) => ({
-            colorKey,
-            waveTileUrl: v.waveTileUrl,
-            standingSeamUrl: v.standingSeamUrl,
-            shingleTileUrl: v.shingleTileUrl,
-          }));
-      };
-
-      const frontResults = buildSideResults("front");
-      const backResults = state.hasBackPhoto ? buildSideResults("back") : [];
-
-      if (frontResults.length === 0 && backResults.length === 0) {
-        throw new Error("Aucune image reussie a inclure dans le PDF");
-      }
-
-      const frontOriginalUrl =
-        state.enhancedImageUrl || state.uploadedImageUrl;
-      const backOriginalUrl = state.hasBackPhoto
-        ? state.backEnhancedImageUrl || state.backUploadedImageUrl
-        : null;
+      const payload = buildPdfPayload();
 
       const res = await fetch("/api/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          originalImageUrl: frontOriginalUrl,
-          results: frontResults,
-          backOriginalImageUrl: backOriginalUrl,
-          backResults,
-          clientName: state.clientName || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -773,21 +790,49 @@ export default function RoofSimulator() {
     } finally {
       dispatch({ type: "SET_PDF_LOADING", loading: false });
     }
-  }, [
-    state.tasks,
-    state.uploadedImageUrl,
-    state.enhancedImageUrl,
-    state.hasBackPhoto,
-    state.backUploadedImageUrl,
-    state.backEnhancedImageUrl,
-    state.clientName,
-  ]);
+  }, [buildPdfPayload, state.clientName]);
+
+  const handleSendEmail = useCallback(
+    async (email: string): Promise<{ ok: boolean; error?: string }> => {
+      try {
+        const payload = buildPdfPayload();
+        const res = await fetch("/api/pdf/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, email }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          return {
+            ok: false,
+            error: data.error || "Erreur lors de l'envoi",
+          };
+        }
+        return { ok: true };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : "Erreur réseau",
+        };
+      }
+    },
+    [buildPdfPayload]
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
 
       <main className="flex-1 py-10 px-4">
+        <div className="max-w-3xl mx-auto mb-4 flex justify-end">
+          <Link
+            href="/roof-simulator/links"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:border-accent hover:text-accent transition-colors"
+          >
+            Créer un lien client →
+          </Link>
+        </div>
+
         {state.error && (
           <div className="max-w-3xl mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
             <p className="font-semibold">Erreur</p>
@@ -1281,6 +1326,7 @@ export default function RoofSimulator() {
               <DownloadButton
                 loading={state.pdfLoading}
                 onClick={handleDownloadPdf}
+                onSendEmail={handleSendEmail}
               />
             )}
 
@@ -1291,6 +1337,10 @@ export default function RoofSimulator() {
               >
                 Recommencer avec une nouvelle photo
               </button>
+            </div>
+
+            <div className="max-w-5xl mx-auto">
+              <SimulationHistory />
             </div>
           </div>
         )}

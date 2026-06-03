@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { COLORS } from "@/lib/colors";
-import { downloadImageAsBuffer, getLogoPngBuffer } from "@/lib/image-utils";
-import { buildPdf } from "@/lib/pdf-builder";
+import { after } from "next/server";
+import {
+  buildSimulationPdf,
+  type SimulationColorResult,
+} from "@/lib/simulator/pdf-helper";
+import { uploadSimulationPdf } from "@/lib/simulator/blob";
+import {
+  addToSimulationHistory,
+  generateSimId,
+} from "@/lib/simulator/history";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
-
-interface ColorResult {
-  colorKey: string;
-  waveTileUrl?: string;
-  standingSeamUrl?: string;
-  shingleTileUrl?: string;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,9 +23,9 @@ export async function POST(request: NextRequest) {
       clientName,
     } = (await request.json()) as {
       originalImageUrl: string;
-      results: ColorResult[];
+      results: SimulationColorResult[];
       backOriginalImageUrl?: string | null;
-      backResults?: ColorResult[];
+      backResults?: SimulationColorResult[];
       clientName?: string;
     };
 
@@ -36,104 +36,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const hasBack = !!(
-      backOriginalImageUrl &&
-      backResults &&
-      backResults.length > 0
-    );
-
-    if (results.length === 0 && !hasBack) {
-      return NextResponse.json(
-        { error: "Aucune image à inclure dans le PDF" },
-        { status: 400 }
-      );
-    }
-
-    // Collect all image URLs to download (front + back)
-    const frontImageUrls: string[] = [];
-    for (const r of results) {
-      if (r.waveTileUrl) frontImageUrls.push(r.waveTileUrl);
-      if (r.standingSeamUrl) frontImageUrls.push(r.standingSeamUrl);
-      if (r.shingleTileUrl) frontImageUrls.push(r.shingleTileUrl);
-    }
-
-    const backImageUrls: string[] = [];
-    if (hasBack) {
-      for (const r of backResults!) {
-        if (r.waveTileUrl) backImageUrls.push(r.waveTileUrl);
-        if (r.standingSeamUrl) backImageUrls.push(r.standingSeamUrl);
-        if (r.shingleTileUrl) backImageUrls.push(r.shingleTileUrl);
-      }
-    }
-
-    const downloadPromises: Promise<Buffer>[] = [
-      getLogoPngBuffer(),
-      downloadImageAsBuffer(originalImageUrl),
-      ...frontImageUrls.map((url) => downloadImageAsBuffer(url)),
-    ];
-    if (hasBack && backOriginalImageUrl) {
-      downloadPromises.push(downloadImageAsBuffer(backOriginalImageUrl));
-      downloadPromises.push(
-        ...backImageUrls.map((url) => downloadImageAsBuffer(url))
-      );
-    }
-
-    const downloaded = await Promise.all(downloadPromises);
-
-    let idx = 0;
-    const logoBuffer = downloaded[idx++];
-    const originalImageBuffer = downloaded[idx++];
-
-    const frontImageBuffers: Buffer[] = [];
-    for (let i = 0; i < frontImageUrls.length; i++) {
-      frontImageBuffers.push(downloaded[idx++]);
-    }
-
-    let backOriginalImageBuffer: Buffer | undefined;
-    const backImageBuffers: Buffer[] = [];
-    if (hasBack) {
-      backOriginalImageBuffer = downloaded[idx++];
-      for (let i = 0; i < backImageUrls.length; i++) {
-        backImageBuffers.push(downloaded[idx++]);
-      }
-    }
-
-    // Map front buffers back to color pages
-    let frontBufIdx = 0;
-    const colorPages = results.map((r) => ({
-      color: COLORS[r.colorKey],
-      waveTileBuffer: r.waveTileUrl ? frontImageBuffers[frontBufIdx++] : undefined,
-      standingSeamBuffer: r.standingSeamUrl
-        ? frontImageBuffers[frontBufIdx++]
-        : undefined,
-      shingleTileBuffer: r.shingleTileUrl
-        ? frontImageBuffers[frontBufIdx++]
-        : undefined,
-    }));
-
-    // Map back buffers back to color pages
-    let backColorPages;
-    if (hasBack) {
-      let backBufIdx = 0;
-      backColorPages = backResults!.map((r) => ({
-        color: COLORS[r.colorKey],
-        waveTileBuffer: r.waveTileUrl ? backImageBuffers[backBufIdx++] : undefined,
-        standingSeamBuffer: r.standingSeamUrl
-          ? backImageBuffers[backBufIdx++]
-          : undefined,
-        shingleTileBuffer: r.shingleTileUrl
-          ? backImageBuffers[backBufIdx++]
-          : undefined,
-      }));
-    }
-
-    const pdfBuffer = await buildPdf({
-      originalImageBuffer,
-      colorPages,
-      backOriginalImageBuffer,
-      backColorPages,
-      logoBuffer,
+    const pdfBuffer = await buildSimulationPdf({
+      originalImageUrl,
+      results,
+      backOriginalImageUrl,
+      backResults,
       clientName,
+    });
+
+    // Best-effort: archive the PDF to Blob + add to the closer-side history.
+    // Runs after the response is flushed; failures only show in server logs.
+    const simId = generateSimId();
+    after(async () => {
+      try {
+        const pdfUrl = await uploadSimulationPdf(pdfBuffer, simId);
+        await addToSimulationHistory({
+          simId,
+          clientName,
+          pdfUrl,
+          thumbnailUrl: originalImageUrl,
+          createdAt: Date.now(),
+          source: "closer-direct",
+        });
+      } catch (err) {
+        console.error("[pdf] history archive failed:", err);
+      }
     });
 
     return new Response(new Uint8Array(pdfBuffer), {

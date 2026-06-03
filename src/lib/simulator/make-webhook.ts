@@ -1,8 +1,13 @@
 /**
  * Make.com email webhook for simulator deliveries.
  *
- * Reuses MAKE_REPORTS_WEBHOOK_URL — the Make scenario is a generic forwarder
- * that accepts { to, subject, body (HTML), pdfUrl? } and emails via SMTP/Gmail.
+ * Uses MAKE_CLIENT_WEBHOOK_URL — the default webhook for ALL client-facing
+ * communications (simulator PDF, invoice). The Make scenario is a generic
+ * forwarder that accepts { to, subject, body (HTML), pdfUrl? } and emails
+ * via SMTP/Gmail.
+ *
+ * (Reports module stays on MAKE_REPORTS_WEBHOOK_URL — freelancer + team only.
+ *  Warranty stays on MAKE_WARRANTY_WEBHOOK_URL — different payload format.)
  */
 
 interface SendEmailParams {
@@ -23,11 +28,11 @@ function escapeHtml(s: string): string {
 export async function fireSimulationEmailWebhook(
   params: SendEmailParams
 ): Promise<{ ok: boolean; error?: string }> {
-  const url = process.env.MAKE_REPORTS_WEBHOOK_URL;
+  const url = process.env.MAKE_CLIENT_WEBHOOK_URL;
   if (!url) {
     return {
       ok: false,
-      error: "MAKE_REPORTS_WEBHOOK_URL non configuré",
+      error: "MAKE_CLIENT_WEBHOOK_URL non configuré",
     };
   }
 

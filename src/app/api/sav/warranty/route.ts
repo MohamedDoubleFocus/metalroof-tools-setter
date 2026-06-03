@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { buildWarrantyPdf } from "@/lib/sav/warranty-pdf";
-import { getWarrantyLogoPngBuffer } from "@/lib/image-utils";
+import { sendWarrantyCertificate } from "@/lib/sav/send-warranty";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -10,28 +9,19 @@ export const maxDuration = 60;
 /**
  * POST /api/sav/warranty
  *
- * Generates a warranty certificate PDF from the submitted form and forwards
- * it to a Make.com webhook (base64-encoded) so Make can send it by email.
- *
- * Auth: requires a NextAuth Google session (internal tool).
+ * Standalone warranty form (NextAuth-gated). Delegates the actual PDF build
+ * + Make.com email forwarding to sendWarrantyCertificate so the chantiers
+ * module can reuse the exact same path.
  *
  * Body:
- *   {
- *     email: string,            // destination
- *     buyerName: string,        // e.g. "Mme Edith Villalon"
- *     addressLine1: string,     // street
- *     addressLine2: string,     // city + province + postal
- *     installationDate: string  // YYYY-MM-DD (from <input type="date">)
- *   }
+ *   { email, buyerName, addressLine1, addressLine2, installationDate (YYYY-MM-DD) }
  */
 export async function POST(request: NextRequest) {
-  // ─── Auth check ─────────────────────────────────────────────────────
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  // ─── Parse + validate body ──────────────────────────────────────────
   let body: {
     email?: string;
     buyerName?: string;
@@ -76,76 +66,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Convert YYYY-MM-DD (HTML date input) → YYYY/MM/DD (template format)
+  // YYYY-MM-DD → YYYY/MM/DD (template format)
   const installationDate = installationDateRaw.replaceAll("-", "/");
 
-  // ─── Build the PDF ──────────────────────────────────────────────────
-  let pdfBuffer: Buffer;
-  try {
-    const logoBuffer = await getWarrantyLogoPngBuffer();
-    pdfBuffer = await buildWarrantyPdf({
-      buyerName,
-      addressLine1,
-      addressLine2,
-      installationDate,
-      logoBuffer,
-    });
-  } catch (err) {
-    console.error("[warranty] PDF build failed:", err);
-    return NextResponse.json(
-      { error: "Erreur lors de la création du PDF" },
-      { status: 500 }
-    );
-  }
-
-  // ─── Forward to Make.com so it can email the PDF ────────────────────
-  const makeUrl = process.env.MAKE_WARRANTY_WEBHOOK_URL;
-  if (!makeUrl) {
-    return NextResponse.json(
-      {
-        error:
-          "MAKE_WARRANTY_WEBHOOK_URL non configuré côté serveur — configurez-le dans les variables d'environnement Vercel.",
-      },
-      { status: 500 }
-    );
-  }
-
-  const filename = `certificat-garantie-${buyerName.replace(/\s+/g, "-").toLowerCase()}.pdf`;
-
-  const payload = {
-    type: "warranty_certificate",
+  const result = await sendWarrantyCertificate({
     email,
     buyerName,
     addressLine1,
     addressLine2,
     installationDate,
-    filename,
-    pdfBase64: pdfBuffer.toString("base64"),
     sentBy: session.user?.email ?? null,
-    sentAt: new Date().toISOString(),
-  };
+  });
 
-  try {
-    const res = await fetch(makeUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      console.error("[warranty] Make webhook failed:", res.status, text.slice(0, 200));
-      return NextResponse.json(
-        { error: `Erreur Make.com (${res.status})` },
-        { status: 502 }
-      );
-    }
-  } catch (err) {
-    console.error("[warranty] Make webhook error:", err);
-    return NextResponse.json(
-      { error: "Impossible de joindre Make.com" },
-      { status: 502 }
-    );
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 502 });
   }
-
-  return NextResponse.json({ success: true, filename });
+  return NextResponse.json({ success: true, filename: result.filename });
 }

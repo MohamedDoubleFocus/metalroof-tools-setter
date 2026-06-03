@@ -55,7 +55,7 @@ export async function fireInvoiceWebhook(
     <p style="margin:0 0 16px;color:#4b5563;">${greeting}</p>
     <p style="margin:0 0 24px;color:#4b5563;">
       Veuillez trouver ci-jointe votre facture finale pour les travaux de toiture métallique réalisés au
-      <strong>${escapeHtml(chantier.addressLine1)}, ${escapeHtml(chantier.addressLine2)}</strong>.
+      <strong>${escapeHtml(chantier.addressLine1)}${chantier.addressLine2 ? ", " + escapeHtml(chantier.addressLine2) : ""}</strong>.
     </p>
 
     <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:16px 0;">
@@ -81,7 +81,7 @@ export async function fireInvoiceWebhook(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        to: chantier.clientEmail,
+        to: chantier.clientEmail ?? "",
         subject: `Facture ${invoiceNumber} — Metal Roof Montréal`,
         body,
         pdfUrl,

@@ -71,11 +71,11 @@ export async function POST(request: NextRequest) {
       if (!phone) throw new Error("clientPhone invalide");
 
       const email = (item.clientEmail || "").trim().toLowerCase();
-      if (!email || !EMAIL_RE.test(email)) throw new Error("clientEmail invalide");
+      if (email && !EMAIL_RE.test(email)) throw new Error("clientEmail invalide");
 
       const addressLine1 = (item.addressLine1 || "").trim();
+      if (!addressLine1) throw new Error("addressLine1 requis");
       const addressLine2 = (item.addressLine2 || "").trim();
-      if (!addressLine1 || !addressLine2) throw new Error("Adresse incomplète");
 
       let signedAt: number | undefined;
       if (typeof item.signedAt === "number") {
@@ -88,9 +88,9 @@ export async function POST(request: NextRequest) {
       const input: CreateChantierInput = {
         clientName,
         clientPhone: phone,
-        clientEmail: email,
+        clientEmail: email || undefined,
         addressLine1,
-        addressLine2,
+        addressLine2: addressLine2 || undefined,
         signedAt,
         scheduledDate: item.scheduledDate,
         totalAmount: item.totalAmount,

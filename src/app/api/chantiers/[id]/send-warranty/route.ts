@@ -25,6 +25,12 @@ export async function POST(
       { status: 404 }
     );
   }
+  if (!chantier.clientEmail) {
+    return NextResponse.json(
+      { error: "Email client manquant — renseigne-le avant d'envoyer la garantie" },
+      { status: 400 }
+    );
+  }
 
   // Resolve install date — prefer explicit scheduledDate, fall back to
   // completedAt or now. Convert YYYY-MM-DD → YYYY/MM/DD (PDF template format).
@@ -42,7 +48,7 @@ export async function POST(
     email: chantier.clientEmail,
     buyerName: chantier.clientName,
     addressLine1: chantier.addressLine1,
-    addressLine2: chantier.addressLine2,
+    addressLine2: chantier.addressLine2 ?? "",
     installationDate,
     sentBy: `chantier:${chantier.id}`,
   });

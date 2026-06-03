@@ -15,9 +15,9 @@ export interface Chantier {
   // ─── Client info (pre-fills warranty + invoice + SMS) ─────────────
   clientName: string;
   clientPhone: string; // E.164
-  clientEmail: string;
-  addressLine1: string; // street + number
-  addressLine2: string; // city + QC + postal code
+  clientEmail?: string; // optional — required only to send invoice / warranty by email
+  addressLine1: string; // street + number (or full single-line address)
+  addressLine2?: string; // city + QC + postal code (optional)
 
   // ─── Workflow ────────────────────────────────────────────────────
   status: ChantierStatus;
@@ -50,9 +50,9 @@ export interface Chantier {
 export interface CreateChantierInput {
   clientName: string;
   clientPhone: string;
-  clientEmail: string;
+  clientEmail?: string;
   addressLine1: string;
-  addressLine2: string;
+  addressLine2?: string;
   signedAt?: number;
   scheduledDate?: string;
   priority?: number;
@@ -63,9 +63,9 @@ export interface CreateChantierInput {
 export interface UpdateChantierInput {
   clientName?: string;
   clientPhone?: string;
-  clientEmail?: string;
+  clientEmail?: string | null;
   addressLine1?: string;
-  addressLine2?: string;
+  addressLine2?: string | null;
   status?: ChantierStatus;
   signedAt?: number;
   scheduledDate?: string | null;

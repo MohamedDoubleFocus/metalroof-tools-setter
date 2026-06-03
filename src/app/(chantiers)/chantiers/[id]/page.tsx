@@ -125,8 +125,12 @@ export default function ChantierDetailPage() {
         </div>
         <div className="text-sm text-gray-700">
           {chantier.addressLine1}
-          <br />
-          {chantier.addressLine2}
+          {chantier.addressLine2 && (
+            <>
+              <br />
+              {chantier.addressLine2}
+            </>
+          )}
         </div>
         <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap pt-2 border-t border-gray-100">
           <a
@@ -135,12 +139,16 @@ export default function ChantierDetailPage() {
           >
             📞 {chantier.clientPhone}
           </a>
-          <a
-            href={`mailto:${chantier.clientEmail}`}
-            className="hover:text-accent underline-offset-2 hover:underline"
-          >
-            ✉️ {chantier.clientEmail}
-          </a>
+          {chantier.clientEmail ? (
+            <a
+              href={`mailto:${chantier.clientEmail}`}
+              className="hover:text-accent underline-offset-2 hover:underline"
+            >
+              ✉️ {chantier.clientEmail}
+            </a>
+          ) : (
+            <span className="text-gray-400 italic">✉️ pas d&apos;email</span>
+          )}
         </div>
       </div>
 

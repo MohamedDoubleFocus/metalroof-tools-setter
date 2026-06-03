@@ -34,6 +34,12 @@ export async function POST(
       { status: 400 }
     );
   }
+  if (!chantier.clientEmail) {
+    return NextResponse.json(
+      { error: "Email client manquant — renseigne-le avant d'envoyer la facture" },
+      { status: 400 }
+    );
+  }
 
   const issuedAt = Date.now();
   const invoiceNumber = formatInvoiceNumber(chantier, issuedAt);

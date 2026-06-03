@@ -56,9 +56,9 @@ export async function createChantier(
     id,
     clientName: input.clientName.trim(),
     clientPhone: input.clientPhone.trim(),
-    clientEmail: input.clientEmail.trim().toLowerCase(),
+    clientEmail: input.clientEmail?.trim().toLowerCase() || undefined,
     addressLine1: input.addressLine1.trim(),
-    addressLine2: input.addressLine2.trim(),
+    addressLine2: input.addressLine2?.trim() || undefined,
     status: "scheduled",
     signedAt: input.signedAt ?? now,
     scheduledDate: input.scheduledDate?.trim() || undefined,
@@ -152,9 +152,14 @@ export async function updateChantier(
     clientName: patch.clientName?.trim() || existing.clientName,
     clientPhone: patch.clientPhone?.trim() || existing.clientPhone,
     clientEmail:
-      patch.clientEmail?.trim().toLowerCase() || existing.clientEmail,
+      patch.clientEmail === undefined
+        ? existing.clientEmail
+        : patch.clientEmail?.trim().toLowerCase() || undefined,
     addressLine1: patch.addressLine1?.trim() || existing.addressLine1,
-    addressLine2: patch.addressLine2?.trim() || existing.addressLine2,
+    addressLine2:
+      patch.addressLine2 === undefined
+        ? existing.addressLine2
+        : patch.addressLine2?.trim() || undefined,
     status: patch.status ?? existing.status,
     signedAt: patch.signedAt ?? existing.signedAt,
     scheduledDate,

@@ -14,12 +14,12 @@
 export const REQUIRED_HEADERS = [
   "clientName",
   "clientPhone",
-  "clientEmail",
   "addressLine1",
-  "addressLine2",
 ] as const;
 
 export const OPTIONAL_HEADERS = [
+  "clientEmail",
+  "addressLine2",
   "signedAt",
   "scheduledDate",
   "totalAmount",
@@ -188,9 +188,9 @@ export function rowToCreateInput(data: Partial<Record<KnownHeader, string>>) {
   return {
     clientName: data.clientName!,
     clientPhone: data.clientPhone!,
-    clientEmail: data.clientEmail!,
+    clientEmail: data.clientEmail,
     addressLine1: data.addressLine1!,
-    addressLine2: data.addressLine2!,
+    addressLine2: data.addressLine2,
     signedAt,
     scheduledDate: data.scheduledDate,
     totalAmount,

@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
   }
 
   const email = (body.clientEmail || "").trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json(
       { error: "clientEmail invalide" },
       { status: 400 }
@@ -86,13 +86,13 @@ export async function POST(request: NextRequest) {
   }
 
   const addressLine1 = (body.addressLine1 || "").trim();
-  const addressLine2 = (body.addressLine2 || "").trim();
-  if (!addressLine1 || !addressLine2) {
+  if (!addressLine1) {
     return NextResponse.json(
-      { error: "addressLine1 + addressLine2 requis" },
+      { error: "addressLine1 requis" },
       { status: 400 }
     );
   }
+  const addressLine2 = (body.addressLine2 || "").trim();
 
   // Resolve signedAt: number (ms), ISO string, or default to now.
   let signedAt: number | undefined;
@@ -107,9 +107,9 @@ export async function POST(request: NextRequest) {
     const chantier = await createChantier({
       clientName,
       clientPhone: phone,
-      clientEmail: email,
+      clientEmail: email || undefined,
       addressLine1,
-      addressLine2,
+      addressLine2: addressLine2 || undefined,
       signedAt,
       scheduledDate: body.scheduledDate,
       priority: body.priority,

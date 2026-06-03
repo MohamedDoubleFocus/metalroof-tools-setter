@@ -114,8 +114,10 @@ export async function buildInvoicePdf(params: BuildInvoiceParams): Promise<Buffe
     );
     y += 14;
     doc.font("Helvetica").fontSize(10).text(chantier.addressLine1, MARGIN, y);
-    y += 13;
-    doc.text(chantier.addressLine2, MARGIN, y);
+    if (chantier.addressLine2) {
+      y += 13;
+      doc.text(chantier.addressLine2, MARGIN, y);
+    }
     if (chantier.clientEmail) {
       y += 13;
       doc.fillColor("#6b7280").text(chantier.clientEmail, MARGIN, y);

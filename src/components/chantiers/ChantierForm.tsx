@@ -108,14 +108,13 @@ export default function ChantierForm() {
         </div>
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">
-            Email
+            Email (optionnel)
           </label>
           <input
             type="email"
             value={form.clientEmail}
             onChange={(e) => update("clientEmail", e.target.value)}
             placeholder="client@exemple.com"
-            required
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
           />
         </div>
@@ -137,14 +136,13 @@ export default function ChantierForm() {
 
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1">
-          Ville, province, code postal
+          Ville, province, code postal (optionnel)
         </label>
         <input
           type="text"
           value={form.addressLine2}
           onChange={(e) => update("addressLine2", e.target.value)}
           placeholder="Montréal, QC H1B 5W5"
-          required
           className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
         />
       </div>

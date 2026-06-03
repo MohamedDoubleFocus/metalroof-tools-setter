@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   }
 
   const email = (body.clientEmail || "").trim().toLowerCase();
-  if (!email || !EMAIL_RE.test(email)) {
+  if (email && !EMAIL_RE.test(email)) {
     return NextResponse.json(
       { error: "Email invalide" },
       { status: 400 }
@@ -52,21 +52,21 @@ export async function POST(request: NextRequest) {
   }
 
   const addressLine1 = (body.addressLine1 || "").trim();
-  const addressLine2 = (body.addressLine2 || "").trim();
-  if (!addressLine1 || !addressLine2) {
+  if (!addressLine1) {
     return NextResponse.json(
-      { error: "Adresse complète requise (rue + ville/QC/postal)" },
+      { error: "Adresse requise" },
       { status: 400 }
     );
   }
+  const addressLine2 = (body.addressLine2 || "").trim();
 
   try {
     const chantier = await createChantier({
       clientName,
       clientPhone: phone,
-      clientEmail: email,
+      clientEmail: email || undefined,
       addressLine1,
-      addressLine2,
+      addressLine2: addressLine2 || undefined,
       signedAt: body.signedAt,
       scheduledDate: body.scheduledDate,
       priority: body.priority,

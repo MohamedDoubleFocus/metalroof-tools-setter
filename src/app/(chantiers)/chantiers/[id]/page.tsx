@@ -168,6 +168,108 @@ export default function ChantierDetailPage() {
         )}
       </div>
 
+      {/* ─── Editable client info ────────────────────────────────── */}
+      <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 space-y-4">
+        <h2 className="text-sm font-bold text-gray-700">Infos client</h2>
+
+        <label className="text-sm block">
+          <div className="font-semibold text-gray-700 mb-1">Nom complet</div>
+          <input
+            type="text"
+            value={chantier.clientName}
+            onChange={(e) =>
+              setChantier({ ...chantier, clientName: e.target.value })
+            }
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v) patch("clientName", { clientName: v });
+            }}
+            disabled={savingField === "clientName"}
+            className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+          />
+        </label>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="text-sm">
+            <div className="font-semibold text-gray-700 mb-1">Téléphone</div>
+            <input
+              type="tel"
+              value={chantier.clientPhone}
+              onChange={(e) =>
+                setChantier({ ...chantier, clientPhone: e.target.value })
+              }
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v) patch("clientPhone", { clientPhone: v });
+              }}
+              disabled={savingField === "clientPhone"}
+              className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+            />
+          </label>
+
+          <label className="text-sm">
+            <div className="font-semibold text-gray-700 mb-1">
+              Email (optionnel)
+            </div>
+            <input
+              type="email"
+              value={chantier.clientEmail ?? ""}
+              placeholder="—"
+              onChange={(e) =>
+                setChantier({ ...chantier, clientEmail: e.target.value })
+              }
+              onBlur={(e) =>
+                patch("clientEmail", {
+                  clientEmail: e.target.value || null,
+                })
+              }
+              disabled={savingField === "clientEmail"}
+              className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+            />
+          </label>
+        </div>
+
+        <label className="text-sm block">
+          <div className="font-semibold text-gray-700 mb-1">
+            Adresse (rue + numéro)
+          </div>
+          <input
+            type="text"
+            value={chantier.addressLine1}
+            onChange={(e) =>
+              setChantier({ ...chantier, addressLine1: e.target.value })
+            }
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v) patch("addressLine1", { addressLine1: v });
+            }}
+            disabled={savingField === "addressLine1"}
+            className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+          />
+        </label>
+
+        <label className="text-sm block">
+          <div className="font-semibold text-gray-700 mb-1">
+            Ville, province, code postal (optionnel)
+          </div>
+          <input
+            type="text"
+            value={chantier.addressLine2 ?? ""}
+            placeholder="Montréal, QC H1B 5W5"
+            onChange={(e) =>
+              setChantier({ ...chantier, addressLine2: e.target.value })
+            }
+            onBlur={(e) =>
+              patch("addressLine2", {
+                addressLine2: e.target.value || null,
+              })
+            }
+            disabled={savingField === "addressLine2"}
+            className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+          />
+        </label>
+      </div>
+
       {/* ─── Editable workflow fields ────────────────────────────── */}
       <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 space-y-4">
         <h2 className="text-sm font-bold text-gray-700">Planification</h2>

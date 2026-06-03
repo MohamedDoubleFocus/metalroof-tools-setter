@@ -110,12 +110,20 @@ export default function ChantiersListPage() {
             sur la fiche.
           </p>
         </div>
-        <Link
-          href="/chantiers/new"
-          className="px-5 py-2.5 bg-accent text-white rounded-xl font-bold text-sm hover:bg-accent-light shadow-sm"
-        >
-          + Nouveau chantier
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/chantiers/import"
+            className="px-4 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-sm hover:border-accent hover:text-accent"
+          >
+            Import bulk
+          </Link>
+          <Link
+            href="/chantiers/new"
+            className="px-5 py-2.5 bg-accent text-white rounded-xl font-bold text-sm hover:bg-accent-light shadow-sm"
+          >
+            + Nouveau chantier
+          </Link>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">

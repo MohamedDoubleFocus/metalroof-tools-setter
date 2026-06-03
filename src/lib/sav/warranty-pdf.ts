@@ -40,7 +40,7 @@ La garantie ne couvre pas les dommages résultant ou attribuables aux éléments
 
 Sont également exclus : les dommages causés par des catastrophes naturelles telles que la foudre, les tornades, les ouragans, la grêle extrême, les tremblements de terre, les chutes d'objets, etc. Les conditions pouvant se développer entre le métal et le revêtement et entraîner la dégradation de ce dernier sont également exclues. Dommages divers incluant, mais sans s'y limiter, les travaux effectués par d'autres entrepreneurs, par le propriétaire lui-même, les abus, le vandalisme, les incendies, les guerres ou les mouvements/affaissements de la structure du bâtiment.
 
-Les réclamations pour des produits défectueux doivent être faites sans délai dès leur découverte. Elles doivent être transmises par écrit, accompagnées d'une copie de la facture originale (preuve de paiement), et d'une copie du certificat de garantie.`;
+Les réclamations pour des produits défectueux doivent être faites sans délai dès leur découverte. Elles doivent être transmises par écrit, accompagnées d'une copie du certificat de garantie.`;
 
 export async function buildWarrantyPdf(
   params: WarrantyParams

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { COLORS } from "@/lib/colors";
+import { COLORS, getColorReferenceUrl } from "@/lib/colors";
 import {
   getEnhancementPrompt,
   getWaveTilePrompt,
@@ -17,6 +17,8 @@ interface RoofTaskDef {
   colorKey: string;
   roofStyle: RoofStyle;
   prompt: string;
+  /** Optional swatch reference URL appended after the source image. */
+  referenceUrl: string | null;
 }
 
 export async function POST(request: NextRequest) {
@@ -43,17 +45,24 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const publicBaseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    new URL(request.url).origin;
+
   // Build roof tasks (index 0 = enhancement, rest = roof tasks)
   const roofTasks: RoofTaskDef[] = [];
   let idx = 1; // start at 1, index 0 is enhancement
   for (const colorKey of colors) {
     const color = COLORS[colorKey];
+    const referenceUrl = getColorReferenceUrl(color, publicBaseUrl);
     if (selectedStyles.includes("wave_tile")) {
       roofTasks.push({
         index: idx++,
         colorKey,
         roofStyle: "wave_tile",
         prompt: getWaveTilePrompt(color),
+        referenceUrl,
       });
     }
     if (selectedStyles.includes("standing_seam")) {
@@ -62,6 +71,7 @@ export async function POST(request: NextRequest) {
         colorKey,
         roofStyle: "standing_seam",
         prompt: getStandingSeamPrompt(color),
+        referenceUrl,
       });
     }
     if (selectedStyles.includes("shingle_tile")) {
@@ -70,6 +80,7 @@ export async function POST(request: NextRequest) {
         colorKey,
         roofStyle: "shingle_tile",
         prompt: getShingleTilePrompt(color),
+        referenceUrl,
       });
     }
   }
@@ -99,7 +110,7 @@ export async function POST(request: NextRequest) {
 
         const enhanceTaskId = await createTask(
           getEnhancementPrompt(),
-          imageUrl
+          [imageUrl]
         );
 
         send({
@@ -153,7 +164,10 @@ export async function POST(request: NextRequest) {
               status: "creating",
             });
 
-            const taskId = await createTask(task.prompt, enhancedImageUrl);
+            const taskImageUrls = task.referenceUrl
+              ? [enhancedImageUrl, task.referenceUrl]
+              : [enhancedImageUrl];
+            const taskId = await createTask(task.prompt, taskImageUrls);
 
             send({
               type: "progress",

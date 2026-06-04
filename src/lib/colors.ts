@@ -1,62 +1,76 @@
 import { ColorDefinition } from "@/types";
 
+/**
+ * MTM commercial paint palette — exactly the 7 colors we can actually deliver.
+ *
+ * Each entry references a swatch photo under public/color-refs/<refSlug>.jpg.
+ * The pipeline passes this swatch as a second image_input to nano-banana-2
+ * so the model has a direct visual anchor for the color — RAL codes alone
+ * are too vague for the model to nail consistently.
+ */
+
 export const COLORS: Record<string, ColorDefinition> = {
-  Black: {
-    name: "Black",
-    frenchName: "Noir",
-    ral: "RAL 9005",
-    hex: "#0A0A0D",
-  },
-  "Slate Gray": {
-    name: "Slate Gray",
-    frenchName: "Gris Ardoise",
-    ral: "RAL 7024",
-    hex: "#474A50",
-  },
-  "Tile Red": {
-    name: "Tile Red",
-    frenchName: "Rouge Tuile",
-    ral: "N/A",
-    hex: "#C45A3C",
-    description:
-      "bright terracotta red with warm orange-red tones, like a classic clay tile color",
-  },
-  Burgundy: {
-    name: "Burgundy",
-    frenchName: "Bordeaux",
+  "Colonial Red": {
+    name: "Colonial Red",
+    frenchName: "Rouge Colonial",
     ral: "RAL 3009",
-    hex: "#6B2D2F",
+    hex: "#6D2922",
+    refSlug: "colonial-red",
   },
-  "Deep Red": {
-    name: "Deep Red",
-    frenchName: "Rouge Fonce",
-    ral: "RAL 3011",
-    hex: "#781F19",
-  },
-  Mocha: {
-    name: "Mocha",
-    frenchName: "Moka",
+  "Brown Mocha": {
+    name: "Brown Mocha",
+    frenchName: "Brun Moka",
     ral: "RAL 8019",
-    hex: "#403A3A",
+    hex: "#3F3A3A",
+    refSlug: "brown-mocha",
   },
-  Chocolate: {
-    name: "Chocolate",
-    frenchName: "Chocolat",
+  "Chocolate Brown": {
+    name: "Chocolate Brown",
+    frenchName: "Brun Chocolat",
     ral: "RAL 8017",
-    hex: "#44322D",
+    hex: "#45322E",
+    refSlug: "chocolate-brown",
   },
-  Terracotta: {
-    name: "Terracotta",
+  "Terra Cotta": {
+    name: "Terra Cotta",
     frenchName: "Terre Cuite",
     ral: "RAL 8004",
-    hex: "#8E4B2E",
+    hex: "#8E402A",
+    refSlug: "terra-cotta",
+  },
+  "Jungle Green": {
+    name: "Jungle Green",
+    frenchName: "Vert Jungle",
+    ral: "RAL 6020",
+    hex: "#3E513A",
+    refSlug: "jungle-green",
   },
   "Blue Gray": {
     name: "Blue Gray",
     frenchName: "Bleu Gris",
     ral: "RAL 7016",
     hex: "#293133",
+    refSlug: "blue-gray",
+  },
+  Black: {
+    name: "Black",
+    frenchName: "Noir",
+    ral: "RAL 9005",
+    hex: "#0A0A0A",
+    refSlug: "black",
   },
 };
 
 export const COLOR_KEYS = Object.keys(COLORS);
+
+/**
+ * Build the absolute URL of the swatch reference image for the given color.
+ * Returns null if the color has no `refSlug` or no base URL is configured.
+ */
+export function getColorReferenceUrl(
+  color: ColorDefinition,
+  publicBaseUrl: string | undefined
+): string | null {
+  if (!color.refSlug || !publicBaseUrl) return null;
+  return `${publicBaseUrl.replace(/\/$/, "")}/color-refs/${color.refSlug}.jpg`;
+}

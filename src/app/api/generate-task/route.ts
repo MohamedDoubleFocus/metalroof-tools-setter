@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { COLORS } from "@/lib/colors";
+import { COLORS, getColorReferenceUrl } from "@/lib/colors";
 import {
   getEnhancementPrompt,
   getWaveTilePrompt,
@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
 
   try {
     let prompt: string;
+    const imageUrls: string[] = [imageUrl];
 
     if (taskType === "enhancement") {
       prompt = getEnhancementPrompt();
@@ -42,10 +43,19 @@ export async function POST(request: NextRequest) {
       } else {
         prompt = getShingleTilePrompt(color, customInstructions);
       }
+
+      // Append the color swatch reference so the model has a visual anchor
+      // for the target paint color — see /color-refs in /public.
+      const publicBaseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.NEXTAUTH_URL ||
+        new URL(request.url).origin;
+      const refUrl = getColorReferenceUrl(color, publicBaseUrl);
+      if (refUrl) imageUrls.push(refUrl);
     }
 
     // Only create the task, return taskId immediately
-    const taskId = await createTask(prompt, imageUrl);
+    const taskId = await createTask(prompt, imageUrls);
 
     return NextResponse.json({
       status: "created",

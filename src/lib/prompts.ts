@@ -17,11 +17,23 @@ Do not change the house design, architecture, window/door positions, number of f
 }
 
 function getColorLine(color: ColorDefinition): string {
-  if (color.ral === "N/A") {
-    return `The color must be ${color.name} — ${color.description} (hex ${color.hex}). Match this exact tone.`;
-  }
-  return `The color must be ${color.name}, ${color.ral} (hex ${color.hex}). Do not approximate, shift the hue, change saturation, brighten, or darken. Strict RAL conformity required.`;
+  const ralBit =
+    color.ral === "N/A"
+      ? `${color.name} — ${color.description ?? ""}`.trim()
+      : `${color.name}, ${color.ral}`;
+  return `The color of the new roof must EXACTLY match the paint color shown in the SECOND reference image — ${ralBit} (hex ${color.hex}). CRITICAL: use the second image ONLY for hue, saturation, and value (the actual color). DO NOT copy the swatch's flat appearance, studio lighting, or surface texture. Apply that color to the roof using the OUTDOOR lighting, shadow play, and tile profile from the FIRST image.`;
 }
+
+/**
+ * Standard intro reminding the model of the role of each input image.
+ * Some calls only pass one image (no swatch available) — the intro stays
+ * accurate because we explicitly say "if a second image is provided".
+ */
+const INPUT_IMAGES_INTRO = `INPUT IMAGES:
+- IMAGE 1 (primary subject): the house whose roof we are modifying.
+- IMAGE 2 (color reference, if provided): a paint swatch showing the EXACT target paint color.
+
+`;
 
 function getCustomInstructionsBlock(customInstructions?: string): string {
   const trimmed = customInstructions?.trim();
@@ -39,7 +51,7 @@ export function getWaveTilePrompt(color: ColorDefinition, customInstructions?: s
   const colorLine = getColorLine(color);
   const customBlock = getCustomInstructionsBlock(customInstructions);
 
-  return `Replace ONLY the main roof covering material on this house. The output roof area must equal the input roof area exactly — no more, no less.
+  return `${INPUT_IMAGES_INTRO}Replace ONLY the main roof covering material on this house. The output roof area must equal the input roof area exactly — no more, no less.
 
 Cover 100% of the original roof surface. Match the exact roof boundaries at pixel level. If the original has multiple roof sections, keep every single one — do not merge, split, add, or omit any section.
 
@@ -118,14 +130,14 @@ export function getShingleTilePrompt(color: ColorDefinition, customInstructions?
     },
   };
 
-  return `${JSON.stringify(spec, null, 2)}${customBlock}`;
+  return `${INPUT_IMAGES_INTRO}${JSON.stringify(spec, null, 2)}${customBlock}`;
 }
 
 export function getStandingSeamPrompt(color: ColorDefinition, customInstructions?: string): string {
   const colorLine = getColorLine(color);
   const customBlock = getCustomInstructionsBlock(customInstructions);
 
-  return `Replace ONLY the main roof covering material on this house. The output roof area must equal the input roof area exactly — no more, no less.
+  return `${INPUT_IMAGES_INTRO}Replace ONLY the main roof covering material on this house. The output roof area must equal the input roof area exactly — no more, no less.
 
 Cover 100% of the original roof surface. Match the exact roof boundaries at pixel level. If the original has multiple roof sections, keep every single one — do not merge, split, add, or omit any section.
 

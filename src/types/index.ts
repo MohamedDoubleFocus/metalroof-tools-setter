@@ -4,6 +4,8 @@ export interface ColorDefinition {
   ral: string;
   hex: string;
   description?: string;
+  /** Slug used to locate the swatch reference image under /public/color-refs/<slug>.jpg */
+  refSlug?: string;
 }
 
 export type RoofStyle = "wave_tile" | "standing_seam" | "shingle_tile";

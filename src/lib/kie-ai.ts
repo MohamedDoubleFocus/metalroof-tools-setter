@@ -47,8 +47,11 @@ export async function uploadImage(
 
 export async function createTask(
   prompt: string,
-  imageUrl: string
+  imageUrls: string[]
 ): Promise<string> {
+  if (imageUrls.length === 0) {
+    throw new Error("createTask: at least one image URL is required");
+  }
   const res = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
     method: "POST",
     headers: {
@@ -59,7 +62,7 @@ export async function createTask(
       model: "nano-banana-2",
       input: {
         prompt,
-        image_input: [imageUrl],
+        image_input: imageUrls,
         aspect_ratio: "auto",
         resolution: "2K",
         output_format: "jpg",

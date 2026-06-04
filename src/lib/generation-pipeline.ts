@@ -13,7 +13,7 @@
  * aggregates all results, persists them, and notifies Make.com.
  */
 
-import { COLORS } from "@/lib/colors";
+import { COLORS, getColorReferenceUrl } from "@/lib/colors";
 import {
   getEnhancementPrompt,
   getWaveTilePrompt,
@@ -67,7 +67,9 @@ function isRateLimitError(err: unknown): boolean {
 
 /**
  * Build the list of (color × style) jobs to run. Matches the user's
- * selections from the client portal.
+ * selections from the client portal. Silently drops any color key that's no
+ * longer in COLORS (e.g. legacy code with a since-removed colorKey) so an
+ * in-flight code from before a palette change still partially completes.
  */
 function buildJobs(
   selectedColors: string[],
@@ -75,7 +77,10 @@ function buildJobs(
 ): GenJobSpec[] {
   const out: GenJobSpec[] = [];
   for (const colorKey of selectedColors) {
-    if (!COLORS[colorKey]) continue;
+    if (!COLORS[colorKey]) {
+      console.warn(`[gen] dropping unknown colorKey: ${colorKey}`);
+      continue;
+    }
     for (const roofStyle of selectedStyles) {
       out.push({
         jobKey: `${colorKey}:${roofStyle}`,
@@ -87,13 +92,29 @@ function buildJobs(
   return out;
 }
 
-/** Pick the right prompt builder for a given style. */
-function promptFor(roofStyle: RoofStyle, colorKey: string): string {
+/**
+ * Build the inputs (prompt + image URLs to pass to Kie.ai) for a given
+ * (style, color) job. The first image is always the house source; any
+ * extra images are color/style references appended after.
+ */
+function jobInputs(
+  roofStyle: RoofStyle,
+  colorKey: string,
+  sourceUrl: string,
+  publicBaseUrl: string | undefined
+): { prompt: string; imageUrls: string[] } {
   const color = COLORS[colorKey];
   if (!color) throw new Error(`Couleur inconnue: ${colorKey}`);
-  if (roofStyle === "wave_tile") return getWaveTilePrompt(color);
-  if (roofStyle === "standing_seam") return getStandingSeamPrompt(color);
-  return getShingleTilePrompt(color);
+
+  let prompt: string;
+  if (roofStyle === "wave_tile") prompt = getWaveTilePrompt(color);
+  else if (roofStyle === "standing_seam") prompt = getStandingSeamPrompt(color);
+  else prompt = getShingleTilePrompt(color);
+
+  const refUrl = getColorReferenceUrl(color, publicBaseUrl);
+  const imageUrls = refUrl ? [sourceUrl, refUrl] : [sourceUrl];
+
+  return { prompt, imageUrls };
 }
 
 /**
@@ -108,7 +129,7 @@ function promptFor(roofStyle: RoofStyle, colorKey: string): string {
  */
 async function runOneTaskWithRetry(
   prompt: string,
-  sourceUrl: string
+  imageUrls: string[]
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   let rateLimitTries = 0;
   let otherTries = 0;
@@ -116,7 +137,7 @@ async function runOneTaskWithRetry(
 
   for (;;) {
     try {
-      const taskId = await createTask(prompt, sourceUrl);
+      const taskId = await createTask(prompt, imageUrls);
       const urls = await pollTaskResult(taskId, KIE_POLL_TIMEOUT_MS);
       if (urls[0]) return { ok: true, url: urls[0] };
       throw new Error("Aucune image retournée");
@@ -212,7 +233,7 @@ export async function runEnhancementStep(
   try {
     const result = await runOneTaskWithRetry(
       getEnhancementPrompt(),
-      meta.sourceImageUrl
+      [meta.sourceImageUrl]
     );
     if (result.ok) enhancedUrl = result.url;
   } catch (err) {
@@ -262,10 +283,13 @@ export async function runRoofJobStep(
   const sourceUrl = meta.enhancedImageUrl || meta.sourceImageUrl;
   let result: GenJobResult;
   try {
-    const r = await runOneTaskWithRetry(
-      promptFor(job.roofStyle, job.colorKey),
-      sourceUrl
+    const { prompt, imageUrls } = jobInputs(
+      job.roofStyle,
+      job.colorKey,
+      sourceUrl,
+      meta.resultsBaseUrl
     );
+    const r = await runOneTaskWithRetry(prompt, imageUrls);
     result = r.ok
       ? { jobKey, ok: true, url: r.url }
       : { jobKey, ok: false, error: r.error };

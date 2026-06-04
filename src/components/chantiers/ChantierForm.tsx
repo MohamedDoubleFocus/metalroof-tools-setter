@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { COLORS, COLOR_KEYS } from "@/lib/colors";
+import type { ChantierStyle, ChantierUrgency } from "@/types/chantiers";
 
 interface FormState {
   clientName: string;
@@ -9,6 +11,10 @@ interface FormState {
   clientEmail: string;
   addressLine1: string;
   addressLine2: string;
+  submissionUrl: string;
+  style: "" | ChantierStyle;
+  colorKey: string;
+  urgency: ChantierUrgency;
   signedAt: string; // YYYY-MM-DD
   scheduledDate: string; // YYYY-MM-DD
   totalAmount: string;
@@ -21,6 +27,10 @@ const EMPTY: FormState = {
   clientEmail: "",
   addressLine1: "",
   addressLine2: "",
+  submissionUrl: "",
+  style: "",
+  colorKey: "",
+  urgency: "non_urgent",
   signedAt: new Date().toISOString().slice(0, 10),
   scheduledDate: "",
   totalAmount: "",
@@ -50,6 +60,10 @@ export default function ChantierForm() {
           clientEmail: form.clientEmail,
           addressLine1: form.addressLine1,
           addressLine2: form.addressLine2,
+          submissionUrl: form.submissionUrl || undefined,
+          style: form.style || undefined,
+          colorKey: form.colorKey || undefined,
+          urgency: form.urgency,
           signedAt: form.signedAt
             ? Date.parse(`${form.signedAt}T12:00:00`)
             : undefined,
@@ -145,6 +159,82 @@ export default function ChantierForm() {
           placeholder="Montréal, QC H1B 5W5"
           className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-1">
+          Lien vers la soumission (optionnel)
+        </label>
+        <input
+          type="url"
+          value={form.submissionUrl}
+          onChange={(e) => update("submissionUrl", e.target.value)}
+          placeholder="https://..."
+          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">
+            Style (optionnel)
+          </label>
+          <select
+            value={form.style}
+            onChange={(e) =>
+              update("style", e.target.value as FormState["style"])
+            }
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none bg-white"
+          >
+            <option value="">Non choisi</option>
+            <option value="shingle_tile">Style européen</option>
+            <option value="standing_seam">Joint debout</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">
+            Couleur (optionnel)
+          </label>
+          <select
+            value={form.colorKey}
+            onChange={(e) => update("colorKey", e.target.value)}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none bg-white"
+          >
+            <option value="">Non choisie</option>
+            {COLOR_KEYS.map((key) => (
+              <option key={key} value={key}>
+                {COLORS[key].frenchName} ({COLORS[key].ral})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-1">
+          Urgence
+        </label>
+        <div className="flex items-center gap-2">
+          {(["urgent", "non_urgent"] as ChantierUrgency[]).map((u) => {
+            const active = form.urgency === u;
+            return (
+              <button
+                key={u}
+                type="button"
+                onClick={() => update("urgency", u)}
+                className={`px-3 py-2 rounded-xl text-sm font-semibold ${
+                  active
+                    ? u === "urgent"
+                      ? "bg-red-500 text-white"
+                      : "bg-gray-700 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {u === "urgent" ? "🔥 Urgent" : "Non urgent"}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

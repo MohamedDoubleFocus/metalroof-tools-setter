@@ -1,15 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createChantier, listAllChantiers } from "@/lib/chantiers/kv";
+import { after } from "next/server";
+import {
+  createChantier,
+  listAllChantiers,
+  setChantierFields,
+} from "@/lib/chantiers/kv";
 import { normalizePhoneE164 } from "@/lib/codes";
+import { geocodeAddress } from "@/lib/chantiers/geocode";
 import type { CreateChantierInput } from "@/types/chantiers";
 
 export const runtime = "nodejs";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const VALID_STYLES = new Set(["shingle_tile", "standing_seam"]);
+const VALID_URGENCY = new Set(["urgent", "non_urgent"]);
 
 export async function GET() {
   try {
     const chantiers = await listAllChantiers();
+
+    // Background backfill: any chantier missing lat/lng gets geocoded after
+    // the response. Doesn't slow the list call; first map open after this
+    // will see most/all coords filled in.
+    after(async () => {
+      const missing = chantiers.filter(
+        (c) => (c.lat == null || c.lng == null) && c.addressLine1
+      );
+      for (const c of missing) {
+        const coords = await geocodeAddress(c.addressLine1, c.addressLine2);
+        if (coords) {
+          await setChantierFields(c.id, coords);
+        }
+      }
+    });
+
     return NextResponse.json({ chantiers });
   } catch (err) {
     return NextResponse.json(
@@ -60,6 +84,11 @@ export async function POST(request: NextRequest) {
   }
   const addressLine2 = (body.addressLine2 || "").trim();
 
+  const style =
+    body.style && VALID_STYLES.has(body.style) ? body.style : undefined;
+  const urgency =
+    body.urgency && VALID_URGENCY.has(body.urgency) ? body.urgency : undefined;
+
   try {
     const chantier = await createChantier({
       clientName,
@@ -67,12 +96,25 @@ export async function POST(request: NextRequest) {
       clientEmail: email || undefined,
       addressLine1,
       addressLine2: addressLine2 || undefined,
+      submissionUrl: body.submissionUrl,
+      style,
+      colorKey: body.colorKey,
+      urgency,
       signedAt: body.signedAt,
       scheduledDate: body.scheduledDate,
       priority: body.priority,
       totalAmount: body.totalAmount,
       notes: body.notes,
     });
+
+    // Geocode in the background — never blocks the response.
+    after(async () => {
+      const coords = await geocodeAddress(addressLine1, addressLine2);
+      if (coords) {
+        await setChantierFields(chantier.id, coords);
+      }
+    });
+
     return NextResponse.json({ chantier });
   } catch (err) {
     return NextResponse.json(

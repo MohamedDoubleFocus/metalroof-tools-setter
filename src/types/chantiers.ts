@@ -7,7 +7,14 @@
  * the final invoice to the client.
  */
 
+import type { RoofStyle } from "@/types";
+
 export type ChantierStatus = "scheduled" | "in_progress" | "done";
+
+/** Only the two roof styles actually offered to clients today. */
+export type ChantierStyle = Extract<RoofStyle, "shingle_tile" | "standing_seam">;
+
+export type ChantierUrgency = "urgent" | "non_urgent";
 
 export interface Chantier {
   id: string;
@@ -15,15 +22,25 @@ export interface Chantier {
   // ─── Client info (pre-fills warranty + invoice + SMS) ─────────────
   clientName: string;
   clientPhone: string; // E.164
-  clientEmail?: string; // optional — required only to send invoice / warranty by email
-  addressLine1: string; // street + number (or full single-line address)
-  addressLine2?: string; // city + QC + postal code (optional)
+  clientEmail?: string;
+  addressLine1: string;
+  addressLine2?: string;
+
+  // ─── Geocoded location (auto-populated at create/update) ──────────
+  lat?: number;
+  lng?: number;
+
+  // ─── Project details ─────────────────────────────────────────────
+  submissionUrl?: string;
+  style?: ChantierStyle;
+  colorKey?: string; // matches a key in src/lib/colors.ts COLORS
+  urgency: ChantierUrgency;
 
   // ─── Workflow ────────────────────────────────────────────────────
   status: ChantierStatus;
-  signedAt: number; // contract signature — default queue order
-  scheduledDate?: string; // YYYY-MM-DD, set later, triggers SMS J-7/J-2
-  priority?: number; // override (smaller = higher). null = sort by signedAt
+  signedAt: number;
+  scheduledDate?: string; // YYYY-MM-DD
+  priority?: number; // when set, pins above non-pinned chantiers
 
   // ─── Money ───────────────────────────────────────────────────────
   totalAmount?: number;
@@ -37,14 +54,14 @@ export interface Chantier {
   startedAt?: number;
   completedAt?: number;
 
-  // ─── SMS tracking (idempotency for the cron) ─────────────────────
+  // ─── SMS tracking ────────────────────────────────────────────────
   smsJ7SentAt?: number;
   smsJ2SentAt?: number;
 
   // ─── Documents sent ──────────────────────────────────────────────
   warrantySentAt?: number;
   invoiceSentAt?: number;
-  invoicePdfUrl?: string; // Vercel Blob archive
+  invoicePdfUrl?: string;
 }
 
 export interface CreateChantierInput {
@@ -53,6 +70,10 @@ export interface CreateChantierInput {
   clientEmail?: string;
   addressLine1: string;
   addressLine2?: string;
+  submissionUrl?: string;
+  style?: ChantierStyle;
+  colorKey?: string;
+  urgency?: ChantierUrgency;
   signedAt?: number;
   scheduledDate?: string;
   priority?: number;
@@ -66,6 +87,10 @@ export interface UpdateChantierInput {
   clientEmail?: string | null;
   addressLine1?: string;
   addressLine2?: string | null;
+  submissionUrl?: string | null;
+  style?: ChantierStyle | null;
+  colorKey?: string | null;
+  urgency?: ChantierUrgency;
   status?: ChantierStatus;
   signedAt?: number;
   scheduledDate?: string | null;

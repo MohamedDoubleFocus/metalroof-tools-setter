@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Chantier } from "@/types/chantiers";
 import ChantierStatusBadge from "./ChantierStatusBadge";
+import UrgencyBadge from "./UrgencyBadge";
+import { COLORS } from "@/lib/colors";
 
 function formatDate(ts: number | undefined): string {
   if (!ts) return "—";
@@ -54,6 +56,14 @@ export default function ChantierCard({ chantier, queuePosition }: Props) {
               {chantier.clientName}
             </h3>
             <ChantierStatusBadge status={chantier.status} />
+            <UrgencyBadge urgency={chantier.urgency} />
+            {chantier.colorKey && COLORS[chantier.colorKey] && (
+              <span
+                className="inline-block w-3 h-3 rounded-full border border-gray-300"
+                style={{ backgroundColor: COLORS[chantier.colorKey].hex }}
+                title={COLORS[chantier.colorKey].frenchName}
+              />
+            )}
             {chantier.warrantySentAt && (
               <span className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded">
                 ✓ Garantie

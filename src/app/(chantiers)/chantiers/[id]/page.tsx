@@ -6,7 +6,14 @@ import Link from "next/link";
 import ChantierStatusBadge from "@/components/chantiers/ChantierStatusBadge";
 import ChantierActions from "@/components/chantiers/ChantierActions";
 import ChantierTimeline from "@/components/chantiers/ChantierTimeline";
-import type { Chantier, ChantierStatus } from "@/types/chantiers";
+import UrgencyBadge from "@/components/chantiers/UrgencyBadge";
+import { COLORS, COLOR_KEYS } from "@/lib/colors";
+import type {
+  Chantier,
+  ChantierStatus,
+  ChantierStyle,
+  ChantierUrgency,
+} from "@/types/chantiers";
 
 const STATUSES: ChantierStatus[] = ["scheduled", "in_progress", "done"];
 
@@ -14,6 +21,11 @@ const STATUS_LABEL: Record<ChantierStatus, string> = {
   scheduled: "Planifié",
   in_progress: "En cours",
   done: "Terminé",
+};
+
+const STYLE_LABEL: Record<ChantierStyle, string> = {
+  shingle_tile: "Style européen",
+  standing_seam: "Joint debout",
 };
 
 export default function ChantierDetailPage() {
@@ -122,6 +134,7 @@ export default function ChantierDetailPage() {
             {chantier.clientName}
           </h1>
           <ChantierStatusBadge status={chantier.status} />
+          <UrgencyBadge urgency={chantier.urgency} />
         </div>
         <div className="text-sm text-gray-700">
           {chantier.addressLine1}
@@ -270,11 +283,125 @@ export default function ChantierDetailPage() {
         </label>
       </div>
 
+      {/* ─── Project details (style + couleur + soumission + urgence) ─── */}
+      <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 space-y-4">
+        <h2 className="text-sm font-bold text-gray-700">Détails projet</h2>
+
+        <label className="text-sm block">
+          <div className="font-semibold text-gray-700 mb-1">
+            Lien vers la soumission
+          </div>
+          <input
+            type="url"
+            value={chantier.submissionUrl ?? ""}
+            placeholder="https://..."
+            onChange={(e) =>
+              setChantier({ ...chantier, submissionUrl: e.target.value })
+            }
+            onBlur={(e) =>
+              patch("submissionUrl", {
+                submissionUrl: e.target.value || null,
+              })
+            }
+            disabled={savingField === "submissionUrl"}
+            className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+          />
+          {chantier.submissionUrl && (
+            <a
+              href={chantier.submissionUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-1 text-xs text-accent hover:underline"
+            >
+              Ouvrir la soumission ↗
+            </a>
+          )}
+        </label>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="text-sm">
+            <div className="font-semibold text-gray-700 mb-1">Style</div>
+            <select
+              value={chantier.style ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                patch("style", {
+                  style: v ? (v as ChantierStyle) : null,
+                });
+              }}
+              disabled={savingField === "style"}
+              className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none bg-white"
+            >
+              <option value="">Non choisi</option>
+              {(Object.keys(STYLE_LABEL) as ChantierStyle[]).map((s) => (
+                <option key={s} value={s}>
+                  {STYLE_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-sm">
+            <div className="font-semibold text-gray-700 mb-1">Couleur</div>
+            <select
+              value={chantier.colorKey ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                patch("colorKey", { colorKey: v || null });
+              }}
+              disabled={savingField === "colorKey"}
+              className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none bg-white"
+            >
+              <option value="">Non choisie</option>
+              {COLOR_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {COLORS[key].frenchName} ({COLORS[key].ral})
+                </option>
+              ))}
+            </select>
+            {chantier.colorKey && COLORS[chantier.colorKey] && (
+              <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
+                <span
+                  className="inline-block w-3 h-3 rounded-full border border-gray-300"
+                  style={{ backgroundColor: COLORS[chantier.colorKey].hex }}
+                />
+                {COLORS[chantier.colorKey].name}
+              </div>
+            )}
+          </label>
+        </div>
+
+        <div>
+          <div className="font-semibold text-gray-700 mb-1 text-sm">Urgence</div>
+          <div className="flex items-center gap-2">
+            {(["urgent", "non_urgent"] as ChantierUrgency[]).map((u) => {
+              const active = chantier.urgency === u;
+              return (
+                <button
+                  key={u}
+                  onClick={() => patch("urgency", { urgency: u })}
+                  disabled={savingField === "urgency"}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                    active
+                      ? u === "urgent"
+                        ? "bg-red-500 text-white"
+                        : "bg-gray-700 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {u === "urgent" ? "🔥 Urgent" : "Non urgent"}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* ─── Editable workflow fields ────────────────────────────── */}
       <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 space-y-4">
         <h2 className="text-sm font-bold text-gray-700">Planification</h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="text-sm">
             <div className="font-semibold text-gray-700 mb-1">
               Statut
@@ -311,27 +438,21 @@ export default function ChantierDetailPage() {
               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
             />
           </label>
-
-          <label className="text-sm">
-            <div className="font-semibold text-gray-700 mb-1">
-              Priorité (override)
-            </div>
-            <input
-              type="number"
-              min="1"
-              value={chantier.priority ?? ""}
-              placeholder="ex: 1"
-              onChange={(e) => {
-                const v = e.target.value;
-                patch("priority", {
-                  priority: v === "" ? null : Number(v),
-                });
-              }}
-              disabled={savingField === "priority"}
-              className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
-            />
-          </label>
         </div>
+
+        {chantier.priority != null && (
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 flex items-center justify-between gap-2">
+            <span>
+              📌 Pinné en priorité #{chantier.priority} (via drag dans le pipeline)
+            </span>
+            <button
+              onClick={() => patch("priority", { priority: null })}
+              className="text-xs underline hover:text-amber-900"
+            >
+              Détacher
+            </button>
+          </div>
+        )}
 
         <label className="text-sm block">
           <div className="font-semibold text-gray-700 mb-1">

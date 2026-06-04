@@ -8,10 +8,10 @@ import ChantierFilters, {
   EMPTY_FILTERS,
   type FiltersState,
 } from "@/components/chantiers/ChantierFilters";
-import ChantierKanban from "@/components/chantiers/ChantierKanban";
+import ChantierMap from "@/components/chantiers/ChantierMap";
 import type { Chantier } from "@/types/chantiers";
 
-export default function ChantiersKanbanPage() {
+export default function ChantiersMapPage() {
   const [chantiers, setChantiers] = useState<Chantier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,17 +52,10 @@ export default function ChantiersKanbanPage() {
             Suivi de chantiers
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Pipeline kanban — glisse les cards pour changer de stage ou monter
-            la priorité.
+            Carte — vue géographique de tous tes chantiers.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href="/chantiers/import"
-            className="px-4 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-sm hover:border-accent hover:text-accent"
-          >
-            Import bulk
-          </Link>
           <Link
             href="/chantiers/new"
             className="px-5 py-2.5 bg-accent text-white rounded-xl font-bold text-sm hover:bg-accent-light shadow-sm"
@@ -75,8 +68,8 @@ export default function ChantiersKanbanPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <ViewSwitch />
         <span className="text-xs text-gray-500">
-          {filtered.length} chantier{filtered.length > 1 ? "s" : ""}
-          {filtered.length !== chantiers.length && ` sur ${chantiers.length}`}
+          {filtered.length} chantier{filtered.length > 1 ? "s" : ""} affiché
+          {filtered.length > 1 ? "s" : ""}
         </span>
       </div>
 
@@ -90,16 +83,8 @@ export default function ChantiersKanbanPage() {
 
       {loading ? (
         <div className="text-center py-10 text-gray-400">Chargement...</div>
-      ) : chantiers.length === 0 ? (
-        <div className="text-center py-12 text-gray-400 text-sm">
-          Aucun chantier encore. Crée le premier.
-        </div>
       ) : (
-        <ChantierKanban
-          chantiers={chantiers}
-          filters={filters}
-          onChange={setChantiers}
-        />
+        <ChantierMap chantiers={filtered} />
       )}
     </div>
   );

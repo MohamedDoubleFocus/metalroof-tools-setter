@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createChantier } from "@/lib/chantiers/kv";
+import { after } from "next/server";
+import { createChantier, setChantierFields } from "@/lib/chantiers/kv";
 import { normalizePhoneE164 } from "@/lib/codes";
+import { geocodeAddress } from "@/lib/chantiers/geocode";
+import type { ChantierStyle, ChantierUrgency } from "@/types/chantiers";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+
+const VALID_STYLES = new Set<ChantierStyle>(["shingle_tile", "standing_seam"]);
+const VALID_URGENCY = new Set<ChantierUrgency>(["urgent", "non_urgent"]);
 
 /**
  * POST /api/webhooks/create-chantier
@@ -49,6 +55,10 @@ export async function POST(request: NextRequest) {
     clientEmail?: string;
     addressLine1?: string;
     addressLine2?: string;
+    submissionUrl?: string;
+    style?: string;
+    colorKey?: string;
+    urgency?: string;
     signedAt?: number | string;
     scheduledDate?: string;
     priority?: number;
@@ -103,6 +113,15 @@ export async function POST(request: NextRequest) {
     if (!Number.isNaN(parsed)) signedAt = parsed;
   }
 
+  const style =
+    body.style && VALID_STYLES.has(body.style as ChantierStyle)
+      ? (body.style as ChantierStyle)
+      : undefined;
+  const urgency =
+    body.urgency && VALID_URGENCY.has(body.urgency as ChantierUrgency)
+      ? (body.urgency as ChantierUrgency)
+      : undefined;
+
   try {
     const chantier = await createChantier({
       clientName,
@@ -110,12 +129,24 @@ export async function POST(request: NextRequest) {
       clientEmail: email || undefined,
       addressLine1,
       addressLine2: addressLine2 || undefined,
+      submissionUrl: body.submissionUrl,
+      style,
+      colorKey: body.colorKey,
+      urgency,
       signedAt,
       scheduledDate: body.scheduledDate,
       priority: body.priority,
       totalAmount: body.totalAmount,
       notes: body.notes,
     });
+
+    after(async () => {
+      const coords = await geocodeAddress(addressLine1, addressLine2 || undefined);
+      if (coords) {
+        await setChantierFields(chantier.id, coords);
+      }
+    });
+
     return NextResponse.json({ success: true, chantier });
   } catch (err) {
     return NextResponse.json(

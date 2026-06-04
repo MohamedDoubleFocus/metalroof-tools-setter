@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createChantier } from "@/lib/chantiers/kv";
+import { after } from "next/server";
+import { createChantier, setChantierFields } from "@/lib/chantiers/kv";
 import { normalizePhoneE164 } from "@/lib/codes";
-import type { CreateChantierInput } from "@/types/chantiers";
+import { geocodeAddress } from "@/lib/chantiers/geocode";
+import type {
+  ChantierStyle,
+  ChantierUrgency,
+  CreateChantierInput,
+} from "@/types/chantiers";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const VALID_STYLES = new Set<ChantierStyle>(["shingle_tile", "standing_seam"]);
+const VALID_URGENCY = new Set<ChantierUrgency>(["urgent", "non_urgent"]);
 
 interface BulkItem {
   clientName?: string;
@@ -14,6 +22,10 @@ interface BulkItem {
   clientEmail?: string;
   addressLine1?: string;
   addressLine2?: string;
+  submissionUrl?: string;
+  style?: string;
+  colorKey?: string;
+  urgency?: string;
   signedAt?: number | string;
   scheduledDate?: string;
   totalAmount?: number;
@@ -85,12 +97,25 @@ export async function POST(request: NextRequest) {
         if (!Number.isNaN(parsed)) signedAt = parsed;
       }
 
+      const style =
+        item.style && VALID_STYLES.has(item.style as ChantierStyle)
+          ? (item.style as ChantierStyle)
+          : undefined;
+      const urgency =
+        item.urgency && VALID_URGENCY.has(item.urgency as ChantierUrgency)
+          ? (item.urgency as ChantierUrgency)
+          : undefined;
+
       const input: CreateChantierInput = {
         clientName,
         clientPhone: phone,
         clientEmail: email || undefined,
         addressLine1,
         addressLine2: addressLine2 || undefined,
+        submissionUrl: item.submissionUrl,
+        style,
+        colorKey: item.colorKey,
+        urgency,
         signedAt,
         scheduledDate: item.scheduledDate,
         totalAmount: item.totalAmount,
@@ -109,6 +134,23 @@ export async function POST(request: NextRequest) {
   }
 
   const successCount = results.filter((r) => r.ok).length;
+
+  // Background-geocode all newly created chantiers. Doesn't block the response.
+  const createdIds = results
+    .filter((r): r is BulkResult & { ok: true; id: string } => r.ok && !!r.id)
+    .map((r, idx) => ({ id: r.id, item: body.items![results[idx].index] }));
+  after(async () => {
+    for (const { id, item } of createdIds) {
+      const a1 = (item.addressLine1 || "").trim();
+      const a2 = (item.addressLine2 || "").trim();
+      if (!a1) continue;
+      const coords = await geocodeAddress(a1, a2 || undefined);
+      if (coords) {
+        await setChantierFields(id, coords);
+      }
+    }
+  });
+
   return NextResponse.json({
     results,
     successCount,

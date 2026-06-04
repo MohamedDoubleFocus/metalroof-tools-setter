@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import {
   getChantier,
   updateChantier,
   deleteChantier,
+  setChantierFields,
 } from "@/lib/chantiers/kv";
 import { normalizePhoneE164 } from "@/lib/codes";
+import { geocodeAddress } from "@/lib/chantiers/geocode";
 import type { UpdateChantierInput } from "@/types/chantiers";
 
 export const runtime = "nodejs";
@@ -49,6 +52,7 @@ export async function PATCH(
     body.clientPhone = phone;
   }
 
+  const existing = await getChantier(id);
   const updated = await updateChantier(id, body);
   if (!updated) {
     return NextResponse.json(
@@ -56,6 +60,24 @@ export async function PATCH(
       { status: 404 }
     );
   }
+
+  // If the address changed, re-geocode in the background.
+  const addressChanged =
+    existing &&
+    (existing.addressLine1 !== updated.addressLine1 ||
+      existing.addressLine2 !== updated.addressLine2);
+  if (addressChanged) {
+    after(async () => {
+      const coords = await geocodeAddress(
+        updated.addressLine1,
+        updated.addressLine2
+      );
+      if (coords) {
+        await setChantierFields(updated.id, coords);
+      }
+    });
+  }
+
   return NextResponse.json({ chantier: updated });
 }
 

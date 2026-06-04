@@ -59,6 +59,10 @@ export async function createChantier(
     clientEmail: input.clientEmail?.trim().toLowerCase() || undefined,
     addressLine1: input.addressLine1.trim(),
     addressLine2: input.addressLine2?.trim() || undefined,
+    submissionUrl: input.submissionUrl?.trim() || undefined,
+    style: input.style,
+    colorKey: input.colorKey?.trim() || undefined,
+    urgency: input.urgency ?? "non_urgent",
     status: "scheduled",
     signedAt: input.signedAt ?? now,
     scheduledDate: input.scheduledDate?.trim() || undefined,
@@ -96,17 +100,28 @@ export async function listChantiersByStatus(
   return items.filter((c): c is Chantier => c !== null);
 }
 
+export { sortQueueOrder } from "./kv-client";
+
 /**
- * Apply default queue ordering: priority asc (smaller = first), null last,
- * then signedAt asc.
+ * Reassign priorities to match a new in-column order. Priority 1 = top.
+ *
+ * Called by /api/chantiers/reorder when a card is dragged within a column.
+ * Keeps priority values dense (1..N) and predictable.
  */
-export function sortQueueOrder(chantiers: Chantier[]): Chantier[] {
-  return [...chantiers].sort((a, b) => {
-    const pa = a.priority ?? Number.POSITIVE_INFINITY;
-    const pb = b.priority ?? Number.POSITIVE_INFINITY;
-    if (pa !== pb) return pa - pb;
-    return a.signedAt - b.signedAt;
-  });
+export async function reorderChantiers(
+  /** All chantiers currently in the same column, in their NEW desired order. */
+  orderedInColumn: string[]
+): Promise<void> {
+  // Reassign priorities to match the new order. Priority 1 = top.
+  await Promise.all(
+    orderedInColumn.map(async (id, idx) => {
+      const existing = await getChantier(id);
+      if (!existing) return;
+      const targetPriority = idx + 1;
+      if (existing.priority === targetPriority) return;
+      await setChantierFields(id, { priority: targetPriority });
+    })
+  );
 }
 
 /**
@@ -145,6 +160,24 @@ export async function updateChantier(
       : patch.notes === null
         ? undefined
         : patch.notes;
+  const submissionUrl =
+    patch.submissionUrl === undefined
+      ? existing.submissionUrl
+      : patch.submissionUrl === null
+        ? undefined
+        : patch.submissionUrl.trim() || undefined;
+  const style =
+    patch.style === undefined
+      ? existing.style
+      : patch.style === null
+        ? undefined
+        : patch.style;
+  const colorKey =
+    patch.colorKey === undefined
+      ? existing.colorKey
+      : patch.colorKey === null
+        ? undefined
+        : patch.colorKey.trim() || undefined;
 
   const now = Date.now();
   const updated: Chantier = {
@@ -160,6 +193,10 @@ export async function updateChantier(
       patch.addressLine2 === undefined
         ? existing.addressLine2
         : patch.addressLine2?.trim() || undefined,
+    submissionUrl,
+    style,
+    colorKey,
+    urgency: patch.urgency ?? existing.urgency ?? "non_urgent",
     status: patch.status ?? existing.status,
     signedAt: patch.signedAt ?? existing.signedAt,
     scheduledDate,
@@ -199,6 +236,9 @@ export async function setChantierFields(
     | "warrantySentAt"
     | "invoiceSentAt"
     | "invoicePdfUrl"
+    | "lat"
+    | "lng"
+    | "priority"
   >>
 ): Promise<Chantier | null> {
   const existing = await getChantier(id);

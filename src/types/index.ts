@@ -4,7 +4,7 @@ export interface ColorDefinition {
   ral: string;
   hex: string;
   description?: string;
-  /** Slug used to locate the swatch reference image under /public/color-refs/<slug>.jpg */
+  /** Slug used to locate the swatch reference image under /public/color-refs/<slug>.png */
   refSlug?: string;
 }
 

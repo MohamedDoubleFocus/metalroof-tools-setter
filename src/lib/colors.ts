@@ -3,7 +3,7 @@ import { ColorDefinition } from "@/types";
 /**
  * MTM commercial paint palette — exactly the 7 colors we can actually deliver.
  *
- * Each entry references a swatch photo under public/color-refs/<refSlug>.jpg.
+ * Each entry references a swatch photo under public/color-refs/<refSlug>.png.
  * The pipeline passes this swatch as a second image_input to nano-banana-2
  * so the model has a direct visual anchor for the color — RAL codes alone
  * are too vague for the model to nail consistently.
@@ -72,5 +72,5 @@ export function getColorReferenceUrl(
   publicBaseUrl: string | undefined
 ): string | null {
   if (!color.refSlug || !publicBaseUrl) return null;
-  return `${publicBaseUrl.replace(/\/$/, "")}/color-refs/${color.refSlug}.jpg`;
+  return `${publicBaseUrl.replace(/\/$/, "")}/color-refs/${color.refSlug}.png`;
 }

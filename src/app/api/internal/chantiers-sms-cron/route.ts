@@ -1,70 +1,27 @@
-import { NextRequest, NextResponse } from "next/server";
-import { listChantiersByStatus, setChantierFields } from "@/lib/chantiers/kv";
-import { sendSms } from "@/lib/openphone";
-import { daysUntil } from "@/lib/chantiers/timezone";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
 
 /**
  * GET /api/internal/chantiers-sms-cron
  *
- * Daily Vercel cron. Scans scheduled chantiers, sends SMS to clients whose
- * scheduledDate is exactly J-7 or J-2 away today (America/Toronto), and
- * marks the corresponding marker so we never re-send on subsequent runs.
+ * SMS rappels J-7 / J-2 — DÉSACTIVÉ.
  *
- * Idempotent: relies on smsJ7SentAt / smsJ2SentAt markers.
+ * Cet endpoint était appelé par un cron Vercel quotidien pour envoyer un SMS
+ * aux clients dont la date d'installation tombait à J-7 ou J-2. Le cron a été
+ * retiré de vercel.json. L'endpoint reste en place comme no-op au cas où une
+ * exécution fantôme du cron arriverait peu après le déploiement.
+ *
+ * Pour réactiver : restaurer la logique d'envoi + remettre l'entrée dans
+ * vercel.json :
+ *   { "path": "/api/internal/chantiers-sms-cron", "schedule": "0 13 * * *" }
+ *
+ * La version pré-désactivation : voir l'historique git.
  */
-export async function GET(request: NextRequest) {
-  // Vercel automatically adds a header on cron-triggered calls; reject anything
-  // else if CRON_SECRET is configured (optional hardening).
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  }
-
-  const chantiers = await listChantiersByStatus("scheduled");
-  const results: Array<{
-    id: string;
-    days: number;
-    sent: boolean;
-    error?: string;
-  }> = [];
-
-  for (const c of chantiers) {
-    if (!c.scheduledDate) continue;
-    const days = daysUntil(c.scheduledDate);
-    if (days == null) continue;
-
-    let kind: "J7" | "J2" | null = null;
-    if (days === 7 && !c.smsJ7SentAt) kind = "J7";
-    else if (days === 2 && !c.smsJ2SentAt) kind = "J2";
-    if (!kind) continue;
-
-    const firstName = c.clientName.split(/\s+/)[0] || "client";
-    const content =
-      kind === "J7"
-        ? `Bonjour ${firstName}, votre installation de toiture métallique avec Metal Roof Montréal est prévue dans une semaine (${c.scheduledDate}). Notre équipe vous contactera quelques jours avant pour finaliser les détails. (514) 867-0787`
-        : `Bonjour ${firstName}, rappel : votre installation de toiture métallique avec Metal Roof Montréal est prévue dans 2 jours (${c.scheduledDate}). À très bientôt ! (514) 867-0787`;
-
-    const res = await sendSms({ to: c.clientPhone, content });
-    if (res.success) {
-      await setChantierFields(c.id, {
-        [kind === "J7" ? "smsJ7SentAt" : "smsJ2SentAt"]: Date.now(),
-      });
-      results.push({ id: c.id, days, sent: true });
-    } else {
-      results.push({ id: c.id, days, sent: false, error: res.error });
-    }
-  }
-
+export async function GET() {
   return NextResponse.json({
     success: true,
-    scanned: chantiers.length,
-    sent: results.filter((r) => r.sent).length,
-    results,
+    disabled: true,
+    message: "SMS rappels J-7/J-2 désactivés",
   });
 }

@@ -38,10 +38,15 @@ interface Props {
 }
 
 export default function ChantierCard({ chantier, queuePosition }: Props) {
+  const isUrgent = chantier.urgency === "urgent";
   return (
     <Link
       href={`/chantiers/${chantier.id}`}
-      className="block bg-white border-2 border-gray-200 rounded-2xl p-4 hover:border-accent hover:shadow-md transition-all"
+      className={`block border-2 rounded-2xl p-4 transition-all ${
+        isUrgent
+          ? "bg-red-50 border-red-300 hover:border-red-500 hover:shadow-md"
+          : "bg-white border-gray-200 hover:border-accent hover:shadow-md"
+      }`}
     >
       <div className="flex items-start gap-3">
         {queuePosition != null && chantier.status === "scheduled" && (

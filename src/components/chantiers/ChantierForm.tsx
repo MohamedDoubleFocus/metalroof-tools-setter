@@ -12,6 +12,7 @@ interface FormState {
   addressLine1: string;
   addressLine2: string;
   submissionUrl: string;
+  roofrUrl: string;
   style: "" | ChantierStyle;
   colorKey: string;
   urgency: ChantierUrgency;
@@ -28,6 +29,7 @@ const EMPTY: FormState = {
   addressLine1: "",
   addressLine2: "",
   submissionUrl: "",
+  roofrUrl: "",
   style: "",
   colorKey: "",
   urgency: "non_urgent",
@@ -61,6 +63,7 @@ export default function ChantierForm() {
           addressLine1: form.addressLine1,
           addressLine2: form.addressLine2,
           submissionUrl: form.submissionUrl || undefined,
+          roofrUrl: form.roofrUrl || undefined,
           style: form.style || undefined,
           colorKey: form.colorKey || undefined,
           urgency: form.urgency,
@@ -161,17 +164,31 @@ export default function ChantierForm() {
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-1">
-          Lien vers la soumission (optionnel)
-        </label>
-        <input
-          type="url"
-          value={form.submissionUrl}
-          onChange={(e) => update("submissionUrl", e.target.value)}
-          placeholder="https://..."
-          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">
+            Lien vers la soumission (optionnel)
+          </label>
+          <input
+            type="url"
+            value={form.submissionUrl}
+            onChange={(e) => update("submissionUrl", e.target.value)}
+            placeholder="https://..."
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">
+            Lien Roofr (optionnel)
+          </label>
+          <input
+            type="url"
+            value={form.roofrUrl}
+            onChange={(e) => update("roofrUrl", e.target.value)}
+            placeholder="https://app.roofr.com/..."
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-accent focus:outline-none"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

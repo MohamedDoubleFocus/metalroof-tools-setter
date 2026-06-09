@@ -128,9 +128,15 @@ export default function ChantierDetailPage() {
       </div>
 
       {/* ─── Header card ──────────────────────────────────────────── */}
-      <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 space-y-2">
-        <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-2xl font-bold text-gray-900">
+      <div
+        className={`border-2 rounded-2xl p-4 sm:p-5 space-y-2 ${
+          chantier.urgency === "urgent"
+            ? "bg-red-50 border-red-300"
+            : "bg-white border-gray-200"
+        }`}
+      >
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
             {chantier.clientName}
           </h1>
           <ChantierStatusBadge status={chantier.status} />
@@ -287,36 +293,67 @@ export default function ChantierDetailPage() {
       <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 space-y-4">
         <h2 className="text-sm font-bold text-gray-700">Détails projet</h2>
 
-        <label className="text-sm block">
-          <div className="font-semibold text-gray-700 mb-1">
-            Lien vers la soumission
-          </div>
-          <input
-            type="url"
-            value={chantier.submissionUrl ?? ""}
-            placeholder="https://..."
-            onChange={(e) =>
-              setChantier({ ...chantier, submissionUrl: e.target.value })
-            }
-            onBlur={(e) =>
-              patch("submissionUrl", {
-                submissionUrl: e.target.value || null,
-              })
-            }
-            disabled={savingField === "submissionUrl"}
-            className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
-          />
-          {chantier.submissionUrl && (
-            <a
-              href={chantier.submissionUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block mt-1 text-xs text-accent hover:underline"
-            >
-              Ouvrir la soumission ↗
-            </a>
-          )}
-        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="text-sm block">
+            <div className="font-semibold text-gray-700 mb-1">
+              Lien vers la soumission
+            </div>
+            <input
+              type="url"
+              value={chantier.submissionUrl ?? ""}
+              placeholder="https://..."
+              onChange={(e) =>
+                setChantier({ ...chantier, submissionUrl: e.target.value })
+              }
+              onBlur={(e) =>
+                patch("submissionUrl", {
+                  submissionUrl: e.target.value || null,
+                })
+              }
+              disabled={savingField === "submissionUrl"}
+              className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+            />
+            {chantier.submissionUrl && (
+              <a
+                href={chantier.submissionUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-1 text-xs text-accent hover:underline"
+              >
+                Ouvrir la soumission ↗
+              </a>
+            )}
+          </label>
+
+          <label className="text-sm block">
+            <div className="font-semibold text-gray-700 mb-1">Lien Roofr</div>
+            <input
+              type="url"
+              value={chantier.roofrUrl ?? ""}
+              placeholder="https://app.roofr.com/..."
+              onChange={(e) =>
+                setChantier({ ...chantier, roofrUrl: e.target.value })
+              }
+              onBlur={(e) =>
+                patch("roofrUrl", {
+                  roofrUrl: e.target.value || null,
+                })
+              }
+              disabled={savingField === "roofrUrl"}
+              className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+            />
+            {chantier.roofrUrl && (
+              <a
+                href={chantier.roofrUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-1 text-xs text-accent hover:underline"
+              >
+                Ouvrir le rapport Roofr ↗
+              </a>
+            )}
+          </label>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="text-sm">

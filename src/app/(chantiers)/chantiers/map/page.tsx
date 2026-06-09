@@ -46,21 +46,21 @@ export default function ChantiersMapPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
             Suivi de chantiers
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">
             Carte — vue géographique de tous tes chantiers.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/chantiers/new"
-            className="px-5 py-2.5 bg-accent text-white rounded-xl font-bold text-sm hover:bg-accent-light shadow-sm"
+            className="px-3 sm:px-5 py-2 sm:py-2.5 bg-accent text-white rounded-xl font-bold text-xs sm:text-sm hover:bg-accent-light shadow-sm whitespace-nowrap"
           >
-            + Nouveau chantier
+            + Nouveau
           </Link>
         </div>
       </div>

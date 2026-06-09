@@ -57,68 +57,73 @@ interface Props {
 }
 
 export default function ChantierFilters({ value, onChange }: Props) {
+  const hasFilters =
+    value.search ||
+    value.style !== "all" ||
+    value.colorKey !== "all" ||
+    value.urgency !== "all";
+
   return (
-    <div className="bg-white border-2 border-gray-200 rounded-2xl p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+    <div className="bg-white border-2 border-gray-200 rounded-2xl p-3 space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-2 sm:flex-wrap">
       <input
         type="search"
         value={value.search}
         onChange={(e) => onChange({ ...value, search: e.target.value })}
         placeholder="Rechercher client, adresse..."
-        className="flex-1 min-w-[200px] px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
+        className="w-full sm:flex-1 sm:min-w-[200px] px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
       />
 
-      <select
-        value={value.style}
-        onChange={(e) =>
-          onChange({
-            ...value,
-            style: e.target.value as FiltersState["style"],
-          })
-        }
-        className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm bg-white focus:border-accent focus:outline-none"
-      >
-        <option value="all">Tous styles</option>
-        <option value="shingle_tile">Style européen</option>
-        <option value="standing_seam">Joint debout</option>
-      </select>
+      <div className="grid grid-cols-3 sm:flex sm:items-center sm:gap-2 gap-2">
+        <select
+          value={value.style}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              style: e.target.value as FiltersState["style"],
+            })
+          }
+          className="px-2 sm:px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm bg-white focus:border-accent focus:outline-none min-w-0"
+        >
+          <option value="all">Styles</option>
+          <option value="shingle_tile">Européen</option>
+          <option value="standing_seam">Joint debout</option>
+        </select>
 
-      <select
-        value={value.colorKey}
-        onChange={(e) => onChange({ ...value, colorKey: e.target.value })}
-        className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm bg-white focus:border-accent focus:outline-none"
-      >
-        <option value="all">Toutes couleurs</option>
-        {COLOR_KEYS.map((key) => (
-          <option key={key} value={key}>
-            {COLORS[key].frenchName}
-          </option>
-        ))}
-      </select>
+        <select
+          value={value.colorKey}
+          onChange={(e) => onChange({ ...value, colorKey: e.target.value })}
+          className="px-2 sm:px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm bg-white focus:border-accent focus:outline-none min-w-0"
+        >
+          <option value="all">Couleurs</option>
+          {COLOR_KEYS.map((key) => (
+            <option key={key} value={key}>
+              {COLORS[key].frenchName}
+            </option>
+          ))}
+        </select>
 
-      <select
-        value={value.urgency}
-        onChange={(e) =>
-          onChange({
-            ...value,
-            urgency: e.target.value as FiltersState["urgency"],
-          })
-        }
-        className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm bg-white focus:border-accent focus:outline-none"
-      >
-        <option value="all">Toutes urgences</option>
-        <option value="urgent">Urgent uniquement</option>
-        <option value="non_urgent">Non urgent</option>
-      </select>
+        <select
+          value={value.urgency}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              urgency: e.target.value as FiltersState["urgency"],
+            })
+          }
+          className="px-2 sm:px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm bg-white focus:border-accent focus:outline-none min-w-0"
+        >
+          <option value="all">Urgence</option>
+          <option value="urgent">🔥 Urgent</option>
+          <option value="non_urgent">Non urgent</option>
+        </select>
+      </div>
 
-      {(value.search ||
-        value.style !== "all" ||
-        value.colorKey !== "all" ||
-        value.urgency !== "all") && (
+      {hasFilters && (
         <button
           onClick={() => onChange(EMPTY_FILTERS)}
-          className="text-xs text-gray-500 hover:text-accent underline-offset-2 hover:underline"
+          className="w-full sm:w-auto text-xs text-gray-500 hover:text-accent underline-offset-2 hover:underline py-1"
         >
-          Effacer
+          Effacer les filtres
         </button>
       )}
     </div>

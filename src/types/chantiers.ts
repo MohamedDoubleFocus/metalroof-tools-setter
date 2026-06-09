@@ -32,6 +32,7 @@ export interface Chantier {
 
   // ─── Project details ─────────────────────────────────────────────
   submissionUrl?: string;
+  roofrUrl?: string; // link to the Roofr report
   style?: ChantierStyle;
   colorKey?: string; // matches a key in src/lib/colors.ts COLORS
   urgency: ChantierUrgency;
@@ -71,6 +72,7 @@ export interface CreateChantierInput {
   addressLine1: string;
   addressLine2?: string;
   submissionUrl?: string;
+  roofrUrl?: string;
   style?: ChantierStyle;
   colorKey?: string;
   urgency?: ChantierUrgency;
@@ -88,6 +90,7 @@ export interface UpdateChantierInput {
   addressLine1?: string;
   addressLine2?: string | null;
   submissionUrl?: string | null;
+  roofrUrl?: string | null;
   style?: ChantierStyle | null;
   colorKey?: string | null;
   urgency?: ChantierUrgency;

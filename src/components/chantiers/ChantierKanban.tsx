@@ -20,11 +20,98 @@ import type { Chantier, ChantierStatus } from "@/types/chantiers";
 import ChantierKanbanCard from "./ChantierKanbanCard";
 import { applyFilters, type FiltersState } from "./ChantierFilters";
 
-const COLUMNS: Array<{ key: ChantierStatus; label: string; tone: string }> = [
-  { key: "scheduled", label: "En attente", tone: "bg-amber-50 border-amber-200" },
-  { key: "in_progress", label: "En cours", tone: "bg-blue-50 border-blue-200" },
-  { key: "done", label: "Fini", tone: "bg-green-50 border-green-200" },
+/**
+ * Kanban columns.
+ *
+ * The 3 month buckets (Juin / Juillet / Août+) are visual subdivisions of
+ * the `scheduled` status — chantiers are classified into a bucket based on
+ * their `scheduledDate`. Drag between month columns updates scheduledDate;
+ * drag to "En attente" clears it. Status only flips when crossing into
+ * "En cours" (in_progress) or "Fini" (done).
+ */
+
+type ColumnKey =
+  | "scheduled_none"
+  | "june"
+  | "july"
+  | "august_plus"
+  | "in_progress"
+  | "done";
+
+interface Column {
+  key: ColumnKey;
+  label: string;
+  tone: string;
+  /** The Chantier.status this column maps to. */
+  status: ChantierStatus;
+  /** If set, drag-in should set scheduledDate to this YYYY-MM-DD. */
+  defaultDate?: string;
+}
+
+// Hardcoded for the current season — change these to roll the buckets forward.
+const YEAR = 2026;
+const COLUMNS: Column[] = [
+  {
+    key: "scheduled_none",
+    label: "En attente",
+    tone: "bg-amber-50 border-amber-200",
+    status: "scheduled",
+  },
+  {
+    key: "june",
+    label: "Juin",
+    tone: "bg-sky-50 border-sky-200",
+    status: "scheduled",
+    defaultDate: `${YEAR}-06-01`,
+  },
+  {
+    key: "july",
+    label: "Juillet",
+    tone: "bg-violet-50 border-violet-200",
+    status: "scheduled",
+    defaultDate: `${YEAR}-07-01`,
+  },
+  {
+    key: "august_plus",
+    label: "Août ou plus tard",
+    tone: "bg-fuchsia-50 border-fuchsia-200",
+    status: "scheduled",
+    defaultDate: `${YEAR}-08-01`,
+  },
+  {
+    key: "in_progress",
+    label: "En cours",
+    tone: "bg-blue-50 border-blue-200",
+    status: "in_progress",
+  },
+  {
+    key: "done",
+    label: "Fini",
+    tone: "bg-green-50 border-green-200",
+    status: "done",
+  },
 ];
+
+/**
+ * Bucket a chantier into one of the 6 columns based on status and
+ * scheduledDate.
+ */
+function columnFor(c: Chantier): ColumnKey {
+  if (c.status === "in_progress") return "in_progress";
+  if (c.status === "done") return "done";
+  // scheduled
+  if (!c.scheduledDate) return "scheduled_none";
+  // scheduledDate is YYYY-MM-DD
+  const parts = c.scheduledDate.split("-");
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  if (year === YEAR && month === 6) return "june";
+  if (year === YEAR && month === 7) return "july";
+  // Aug+: anything from Aug YEAR onwards, or any future year
+  if (year > YEAR || (year === YEAR && month >= 8)) return "august_plus";
+  // Past dates (before June YEAR) — show in En attente so they're not lost
+  return "scheduled_none";
+}
 
 interface Props {
   chantiers: Chantier[];
@@ -33,7 +120,7 @@ interface Props {
 }
 
 interface DroppableColumnProps {
-  column: (typeof COLUMNS)[number];
+  column: Column;
   items: Chantier[];
 }
 
@@ -43,23 +130,23 @@ function DroppableColumn({ column, items }: DroppableColumnProps) {
     <div
       ref={setNodeRef}
       className={`
-        flex-1 min-w-[260px] max-w-md flex flex-col rounded-2xl border-2
+        flex-shrink-0 w-[260px] sm:w-[280px] flex flex-col rounded-2xl border-2
         ${column.tone}
         ${isOver ? "ring-2 ring-accent ring-offset-2" : ""}
       `}
     >
-      <div className="px-4 py-3 border-b border-current/10 flex items-center justify-between">
-        <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wide">
+      <div className="px-3 py-2.5 border-b border-current/10 flex items-center justify-between rounded-t-2xl">
+        <h3 className="font-bold text-gray-900 text-xs uppercase tracking-wide truncate">
           {column.label}
         </h3>
-        <span className="text-xs font-bold text-gray-600 bg-white/60 px-2 py-0.5 rounded-full">
+        <span className="text-xs font-bold text-gray-600 bg-white/70 px-2 py-0.5 rounded-full shrink-0 ml-2">
           {items.length}
         </span>
       </div>
       <SortableContext items={items.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-        <div className="p-2 flex flex-col gap-2 overflow-y-auto max-h-[calc(100vh-280px)]">
+        <div className="p-2 flex flex-col gap-2 overflow-y-auto max-h-[calc(100vh-300px)] min-h-[120px]">
           {items.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-8">
+            <p className="text-xs text-gray-400 text-center py-6">
               Aucun chantier
             </p>
           ) : (
@@ -79,21 +166,22 @@ export default function ChantierKanban({ chantiers, filters, onChange }: Props) 
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
 
-  // Apply filters to what's rendered in each column. Drag math also uses
-  // the filtered subset — that's consistent with what the user sees.
   const visible = useMemo(
     () => applyFilters(chantiers, filters),
     [chantiers, filters]
   );
 
-  const byStatus = useMemo(() => {
-    const grouped: Record<ChantierStatus, Chantier[]> = {
-      scheduled: [],
+  const byColumn = useMemo(() => {
+    const grouped: Record<ColumnKey, Chantier[]> = {
+      scheduled_none: [],
+      june: [],
+      july: [],
+      august_plus: [],
       in_progress: [],
       done: [],
     };
-    for (const c of visible) grouped[c.status].push(c);
-    for (const k of Object.keys(grouped) as ChantierStatus[]) {
+    for (const c of visible) grouped[columnFor(c)].push(c);
+    for (const k of Object.keys(grouped) as ColumnKey[]) {
       grouped[k] = sortQueueOrder(grouped[k]);
     }
     return grouped;
@@ -115,57 +203,91 @@ export default function ChantierKanban({ chantiers, filters, onChange }: Props) 
     const draggedId = String(active.id);
     const overId = String(over.id);
 
-    // Find dragged chantier
     const dragged = chantiers.find((c) => c.id === draggedId);
     if (!dragged) return;
 
-    // Determine target column: either the column key directly, or the card's column
-    const isColumnId = COLUMNS.some((col) => col.key === overId);
-    const overCard = !isColumnId ? chantiers.find((c) => c.id === overId) : null;
-    const targetStatus: ChantierStatus = isColumnId
-      ? (overId as ChantierStatus)
-      : overCard?.status ?? dragged.status;
+    // Determine target column: either a column key directly, or another card's column.
+    const targetColumn = COLUMNS.find((col) => col.key === overId) ?? null;
+    const overCard = !targetColumn
+      ? chantiers.find((c) => c.id === overId)
+      : null;
+    const target =
+      targetColumn ??
+      (overCard ? COLUMNS.find((col) => col.key === columnFor(overCard)) : null);
+    if (!target) return;
 
-    // Cross-column move: update status, clear priority (status drives sort then).
-    if (targetStatus !== dragged.status) {
-      const updated = chantiers.map((c) =>
-        c.id === draggedId
-          ? { ...c, status: targetStatus, priority: undefined }
-          : c
-      );
+    const currentColumn = columnFor(dragged);
+
+    // Same-column reorder → priority pin.
+    if (target.key === currentColumn) {
+      if (!overCard || overCard.id === draggedId) return;
+      const columnIds = byColumn[target.key].map((c) => c.id);
+      const fromIdx = columnIds.indexOf(draggedId);
+      const toIdx = columnIds.indexOf(overCard.id);
+      if (fromIdx < 0 || toIdx < 0) return;
+
+      const newOrder = [...columnIds];
+      newOrder.splice(fromIdx, 1);
+      newOrder.splice(toIdx, 0, draggedId);
+
+      const updated = chantiers.map((c) => {
+        const idx = newOrder.indexOf(c.id);
+        if (idx < 0) return c;
+        return { ...c, priority: idx + 1 };
+      });
       onChange(updated);
-      await fetch(`/api/chantiers/${draggedId}`, {
-        method: "PATCH",
+
+      await fetch("/api/chantiers/reorder", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: targetStatus, priority: null }),
+        body: JSON.stringify({ ids: newOrder }),
       });
       return;
     }
 
-    // Same-column reorder: pin via priority assignment.
-    if (!overCard || overCard.id === draggedId) return;
-    const columnIds = byStatus[targetStatus].map((c) => c.id);
-    const fromIdx = columnIds.indexOf(draggedId);
-    const toIdx = columnIds.indexOf(overCard.id);
-    if (fromIdx < 0 || toIdx < 0) return;
+    // Cross-column move: figure out the patch to apply.
+    const patch: {
+      status?: ChantierStatus;
+      scheduledDate?: string | null;
+      priority?: null;
+    } = { priority: null };
 
-    // Build new order
-    const newOrder = [...columnIds];
-    newOrder.splice(fromIdx, 1);
-    newOrder.splice(toIdx, 0, draggedId);
+    if (target.status !== dragged.status) {
+      patch.status = target.status;
+    }
 
-    // Optimistic UI: assign new priority 1..N
-    const updated = chantiers.map((c) => {
-      const idx = newOrder.indexOf(c.id);
-      if (idx < 0) return c;
-      return { ...c, priority: idx + 1 };
-    });
+    // Month buckets set scheduledDate; "En attente" clears it.
+    if (target.key === "scheduled_none") {
+      patch.scheduledDate = null;
+    } else if (target.defaultDate) {
+      // Only override if moving INTO a different month bucket (don't overwrite
+      // a fine-grained date when dropping into the same bucket).
+      const currentMonth = dragged.scheduledDate?.slice(0, 7);
+      const targetMonth = target.defaultDate.slice(0, 7);
+      if (currentMonth !== targetMonth) {
+        patch.scheduledDate = target.defaultDate;
+      }
+    }
+
+    const updated = chantiers.map((c) =>
+      c.id === draggedId
+        ? {
+            ...c,
+            status: patch.status ?? c.status,
+            scheduledDate:
+              patch.scheduledDate === undefined
+                ? c.scheduledDate
+                : patch.scheduledDate ?? undefined,
+            priority: undefined,
+          }
+        : c
+    );
     onChange(updated);
 
-    await fetch("/api/chantiers/reorder", {
-      method: "POST",
+    await fetch(`/api/chantiers/${draggedId}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: newOrder }),
+      body: JSON.stringify(patch),
     });
   };
 
@@ -175,15 +297,17 @@ export default function ChantierKanban({ chantiers, filters, onChange }: Props) 
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-3 px-3 sm:mx-0 sm:px-0 snap-x snap-mandatory sm:snap-none">
         {COLUMNS.map((col) => (
-          <DroppableColumn key={col.key} column={col} items={byStatus[col.key]} />
+          <div key={col.key} className="snap-start sm:snap-none">
+            <DroppableColumn column={col} items={byColumn[col.key]} />
+          </div>
         ))}
       </div>
 
       <DragOverlay>
         {activeChantier && (
-          <div className="w-72">
+          <div className="w-[260px]">
             <ChantierKanbanCard chantier={activeChantier} isDragOverlay />
           </div>
         )}

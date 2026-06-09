@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
       addressLine1,
       addressLine2: addressLine2 || undefined,
       submissionUrl: body.submissionUrl,
+      roofrUrl: body.roofrUrl,
       style,
       colorKey: body.colorKey,
       urgency,

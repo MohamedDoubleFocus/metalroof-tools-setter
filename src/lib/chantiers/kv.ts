@@ -60,6 +60,7 @@ export async function createChantier(
     addressLine1: input.addressLine1.trim(),
     addressLine2: input.addressLine2?.trim() || undefined,
     submissionUrl: input.submissionUrl?.trim() || undefined,
+    roofrUrl: input.roofrUrl?.trim() || undefined,
     style: input.style,
     colorKey: input.colorKey?.trim() || undefined,
     urgency: input.urgency ?? "non_urgent",
@@ -166,6 +167,12 @@ export async function updateChantier(
       : patch.submissionUrl === null
         ? undefined
         : patch.submissionUrl.trim() || undefined;
+  const roofrUrl =
+    patch.roofrUrl === undefined
+      ? existing.roofrUrl
+      : patch.roofrUrl === null
+        ? undefined
+        : patch.roofrUrl.trim() || undefined;
   const style =
     patch.style === undefined
       ? existing.style
@@ -194,6 +201,7 @@ export async function updateChantier(
         ? existing.addressLine2
         : patch.addressLine2?.trim() || undefined,
     submissionUrl,
+    roofrUrl,
     style,
     colorKey,
     urgency: patch.urgency ?? existing.urgency ?? "non_urgent",

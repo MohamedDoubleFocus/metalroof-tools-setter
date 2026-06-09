@@ -59,6 +59,7 @@ export default function ChantierKanbanCard({ chantier, isDragOverlay }: Props) {
   const color = chantier.colorKey ? COLORS[chantier.colorKey] : undefined;
   const amount = formatAmount(chantier.totalAmount);
   const isPinned = chantier.priority != null;
+  const isUrgent = chantier.urgency === "urgent";
 
   return (
     <div
@@ -67,14 +68,27 @@ export default function ChantierKanbanCard({ chantier, isDragOverlay }: Props) {
       {...attributes}
       {...listeners}
       className={`
-        group bg-white border-2 rounded-xl p-3 cursor-grab active:cursor-grabbing
-        ${isPinned ? "border-amber-300" : "border-gray-200"}
+        group border-2 rounded-xl p-3 cursor-grab active:cursor-grabbing
+        ${
+          isUrgent
+            ? "bg-red-50 border-red-300 hover:border-red-500"
+            : isPinned
+              ? "bg-white border-amber-300 hover:border-accent"
+              : "bg-white border-gray-200 hover:border-accent"
+        }
         ${isDragging ? "opacity-30" : ""}
-        ${isDragOverlay ? "shadow-2xl rotate-2 cursor-grabbing" : "hover:border-accent hover:shadow-sm"}
+        ${isDragOverlay ? "shadow-2xl rotate-2 cursor-grabbing" : "hover:shadow-sm"}
         transition-all
       `}
     >
-      {/* Top: client name + urgency */}
+      {/* Top: urgency tag (if urgent) — very visible */}
+      {isUrgent && (
+        <div className="mb-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-bold uppercase tracking-wide">
+          🔥 Urgent
+        </div>
+      )}
+
+      {/* Client name + pinned indicator */}
       <div className="flex items-start gap-1.5 mb-1">
         <div className="font-bold text-sm text-gray-900 truncate flex-1 leading-tight">
           {chantier.clientName}
@@ -84,7 +98,6 @@ export default function ChantierKanbanCard({ chantier, isDragOverlay }: Props) {
             📌
           </span>
         )}
-        <UrgencyBadge urgency={chantier.urgency} compact />
       </div>
 
       {/* Address — single line, truncated */}
@@ -142,19 +155,34 @@ export default function ChantierKanbanCard({ chantier, isDragOverlay }: Props) {
         >
           Ouvrir →
         </Link>
-        {chantier.submissionUrl && (
-          <a
-            href={chantier.submissionUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            className="text-[11px] text-gray-500 hover:text-accent"
-            title="Lien soumission"
-          >
-            📄 Soumission
-          </a>
-        )}
+        <div className="flex items-center gap-2">
+          {chantier.submissionUrl && (
+            <a
+              href={chantier.submissionUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="text-[11px] text-gray-500 hover:text-accent"
+              title="Lien soumission"
+            >
+              📄 Soum.
+            </a>
+          )}
+          {chantier.roofrUrl && (
+            <a
+              href={chantier.roofrUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="text-[11px] text-gray-500 hover:text-accent"
+              title="Rapport Roofr"
+            >
+              🏠 Roofr
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
     addressLine1?: string;
     addressLine2?: string;
     submissionUrl?: string;
+    roofrUrl?: string;
     style?: string;
     colorKey?: string;
     urgency?: string;
@@ -130,6 +131,7 @@ export async function POST(request: NextRequest) {
       addressLine1,
       addressLine2: addressLine2 || undefined,
       submissionUrl: body.submissionUrl,
+      roofrUrl: body.roofrUrl,
       style,
       colorKey: body.colorKey,
       urgency,

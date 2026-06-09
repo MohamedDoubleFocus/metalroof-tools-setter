@@ -23,6 +23,7 @@ interface BulkItem {
   addressLine1?: string;
   addressLine2?: string;
   submissionUrl?: string;
+  roofrUrl?: string;
   style?: string;
   colorKey?: string;
   urgency?: string;
@@ -113,6 +114,7 @@ export async function POST(request: NextRequest) {
         addressLine1,
         addressLine2: addressLine2 || undefined,
         submissionUrl: item.submissionUrl,
+        roofrUrl: item.roofrUrl,
         style,
         colorKey: item.colorKey,
         urgency,

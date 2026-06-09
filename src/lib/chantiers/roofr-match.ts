@@ -54,6 +54,12 @@ function stripAccents(s: string): string {
 /** Lowercase, strip accents, expand abbreviations, collapse whitespace. */
 export function normalizeAddress(input: string): string {
   let s = stripAccents(input).toLowerCase();
+  // Strip the .pdf extension if present (Roofr PDFs come with it in the title).
+  s = s.replace(/\.pdf\b/g, "");
+  // Strip trailing noise common in Roofr titles: ", quebec, canada", ", canada"
+  s = s.replace(/,?\s*quebec\s*,?\s*canada\s*$/g, "");
+  s = s.replace(/,?\s*canada\s*$/g, "");
+  s = s.replace(/,?\s*quebec\s*$/g, "");
   // Strip punctuation except spaces, hyphens, and alphanumerics.
   s = s.replace(/[^\w\s-]/g, " ");
   for (const [re, repl] of ABBREVIATIONS) {

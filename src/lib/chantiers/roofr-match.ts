@@ -1,19 +1,18 @@
 /**
  * Fuzzy address matching used by the Roofr PDF import flow.
  *
- * Given a list of {address, roofrUrl} entries (from a Google Sheets export
- * of all Drive PDFs) and the full list of chantiers, we score each row
- * against every chantier and pick the best match.
+ * Strategy: token-set similarity (Sørensen-Dice) on meaningful words +
+ * bonuses for civic number and postal code matches. Designed to work even
+ * when neither side has a postal code (common case in Quebec data).
  *
  * Score breakdown (max 100):
- *   - Postal code match (both have one + identical)  → +60
+ *   - Meaningful token overlap (Sørensen-Dice × 65)  → 0..65
  *   - Civic number match (leading digits identical)  → +20
- *   - First street word match (after the civic)      → +10
- *   - Levenshtein similarity on the normalized rest  → 0..10
+ *   - Postal code match (both have one + identical)  → +15
  *
  * Decision:
- *   - score ≥ 80 → high-confidence (auto-attach by default)
- *   - 50–79      → suggested (require human review)
+ *   - score ≥ 75 → high-confidence (auto-attach by default)
+ *   - 50–74      → suggested (require human review)
  *   - < 50       → no match
  */
 
@@ -60,8 +59,10 @@ export function normalizeAddress(input: string): string {
   s = s.replace(/,?\s*quebec\s*,?\s*canada\s*$/g, "");
   s = s.replace(/,?\s*canada\s*$/g, "");
   s = s.replace(/,?\s*quebec\s*$/g, "");
-  // Strip punctuation except spaces, hyphens, and alphanumerics.
-  s = s.replace(/[^\w\s-]/g, " ");
+  // Strip ALL punctuation (incl. hyphens) — replace with spaces so
+  // "Saint-Eustache" and "Saint Eustache" tokenize identically.
+  s = s.replace(/[^\w\s]/g, " ");
+  s = s.replace(/-/g, " ");
   for (const [re, repl] of ABBREVIATIONS) {
     s = s.replace(re, repl);
   }
@@ -72,7 +73,48 @@ export function normalizeAddress(input: string): string {
 // ─── Component extraction ────────────────────────────────────────────────
 
 const POSTAL_CODE_RE = /([a-z]\d[a-z])\s?(\d[a-z]\d)/i;
-const LEADING_CIVIC_RE = /^(\d+(?:-\d+)?[a-z]?)\s/i;
+// Civic = leading digits (optionally with letter suffix like "1187a").
+const LEADING_CIVIC_RE = /^(\d+[a-z]?)\s/i;
+
+/**
+ * Stop words to exclude from token-set similarity. These are common French
+ * address connectors / boilerplate that appear on basically every address —
+ * counting them would inflate every score artificially.
+ */
+const STOP_WORDS = new Set([
+  // Street types (already distinctive via abbreviation expansion)
+  "rue",
+  "avenue",
+  "chemin",
+  "boulevard",
+  "place",
+  "rang",
+  "terrasse",
+  "impasse",
+  "montee",
+  "croissant",
+  "highridge",
+  "road",
+  "av",
+  // Saint prefix (very common, doesn't distinguish)
+  "saint",
+  "sainte",
+  "st",
+  "ste",
+  // Articles & connectors
+  "des",
+  "du",
+  "de",
+  "la",
+  "le",
+  "les",
+  "d",
+  "l",
+  // Geographic noise
+  "quebec",
+  "qc",
+  "canada",
+]);
 
 function extractPostalCode(normalized: string): string | null {
   const m = normalized.match(POSTAL_CODE_RE);
@@ -86,45 +128,27 @@ function extractCivic(normalized: string): string | null {
   return m[1].toLowerCase();
 }
 
-/** First non-numeric, non-civic word — usually the street type or name. */
-function extractFirstStreetWord(normalized: string): string | null {
-  const withoutCivic = normalized.replace(LEADING_CIVIC_RE, "").trim();
-  const firstWord = withoutCivic.split(" ")[0];
-  return firstWord || null;
+/**
+ * Split into meaningful tokens — drop stop words, very short tokens, and
+ * pure-numeric tokens (civic is handled separately as a bonus).
+ */
+function meaningfulTokens(normalized: string): Set<string> {
+  return new Set(
+    normalized
+      .split(/[\s,]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 2)
+      .filter((t) => !STOP_WORDS.has(t))
+      .filter((t) => !/^\d+$/.test(t)) // pure numbers (civic, postal digits)
+  );
 }
 
-// ─── Levenshtein (memory-efficient row-rolling variant) ──────────────────
-
-function levenshtein(a: string, b: string): number {
-  if (a === b) return 0;
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-  const prev = new Array<number>(b.length + 1);
-  const curr = new Array<number>(b.length + 1);
-  for (let j = 0; j <= b.length; j++) prev[j] = j;
-  for (let i = 1; i <= a.length; i++) {
-    curr[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      curr[j] = Math.min(
-        curr[j - 1] + 1, // insertion
-        prev[j] + 1, // deletion
-        prev[j - 1] + cost // substitution
-      );
-    }
-    for (let j = 0; j <= b.length; j++) prev[j] = curr[j];
-  }
-  return prev[b.length];
-}
-
-/** Normalize Levenshtein into a 0..10 score (10 = identical). */
-function similarityScore(a: string, b: string): number {
-  if (!a || !b) return 0;
-  const max = Math.max(a.length, b.length);
-  if (max === 0) return 10;
-  const dist = levenshtein(a, b);
-  const sim = 1 - dist / max;
-  return Math.max(0, Math.round(sim * 10));
+function diceCoefficient(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 1;
+  if (a.size === 0 || b.size === 0) return 0;
+  let intersection = 0;
+  for (const t of a) if (b.has(t)) intersection++;
+  return (2 * intersection) / (a.size + b.size);
 }
 
 // ─── Scoring ─────────────────────────────────────────────────────────────
@@ -134,7 +158,7 @@ export interface ChantierAddressFeatures {
   normalized: string;
   postal: string | null;
   civic: string | null;
-  firstStreetWord: string | null;
+  tokens: Set<string>;
 }
 
 export function featuresOf(rawAddress: string): ChantierAddressFeatures {
@@ -144,7 +168,7 @@ export function featuresOf(rawAddress: string): ChantierAddressFeatures {
     normalized,
     postal: extractPostalCode(normalized),
     civic: extractCivic(normalized),
-    firstStreetWord: extractFirstStreetWord(normalized),
+    tokens: meaningfulTokens(normalized),
   };
 }
 
@@ -157,8 +181,7 @@ export interface MatchScore {
   score: number; // 0..100
   postalMatch: boolean;
   civicMatch: boolean;
-  firstStreetMatch: boolean;
-  similarity: number; // 0..10
+  tokenDice: number; // 0..1
 }
 
 export function scoreMatch(
@@ -166,20 +189,22 @@ export function scoreMatch(
   chantier: ChantierAddressFeatures
 ): MatchScore {
   let score = 0;
-  const postalMatch =
-    !!csv.postal && !!chantier.postal && csv.postal === chantier.postal;
-  if (postalMatch) score += 60;
+
+  // Token-set similarity is the main signal (max 65 points).
+  const tokenDice = diceCoefficient(csv.tokens, chantier.tokens);
+  score += Math.round(tokenDice * 65);
+
+  // Civic match is a strong anchor (max 20 points).
   const civicMatch =
     !!csv.civic && !!chantier.civic && csv.civic === chantier.civic;
   if (civicMatch) score += 20;
-  const firstStreetMatch =
-    !!csv.firstStreetWord &&
-    !!chantier.firstStreetWord &&
-    csv.firstStreetWord === chantier.firstStreetWord;
-  if (firstStreetMatch) score += 10;
-  const similarity = similarityScore(csv.normalized, chantier.normalized);
-  score += similarity;
-  return { score, postalMatch, civicMatch, firstStreetMatch, similarity };
+
+  // Postal match is a tiebreaker bonus (max 15 points).
+  const postalMatch =
+    !!csv.postal && !!chantier.postal && csv.postal === chantier.postal;
+  if (postalMatch) score += 15;
+
+  return { score, postalMatch, civicMatch, tokenDice };
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────
@@ -243,7 +268,7 @@ export function buildProposals(
     const bestScore = best?.score.score ?? 0;
 
     let verdict: MatchVerdict;
-    if (bestScore >= 80) verdict = "auto";
+    if (bestScore >= 75) verdict = "auto";
     else if (bestScore >= 50) verdict = "review";
     else verdict = "none";
 

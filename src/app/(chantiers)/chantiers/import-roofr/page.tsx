@@ -434,47 +434,57 @@ export default function ImportRoofrPage() {
                         PDF : {p.csvAddress}
                       </div>
 
-                      {p.bestChantierId && (
-                        <>
-                          <div className="text-xs text-gray-600 mt-1">
-                            <span className="text-gray-400">→</span> Match :{" "}
-                            <strong>{p.bestChantierLabel}</strong>{" "}
-                            <span className="text-gray-500">
-                              ({p.bestChantierAddress})
-                            </span>
-                          </div>
-
-                          {p.verdict === "review" && p.candidates.length > 1 && (
-                            <div className="mt-2 space-y-1">
-                              <div className="text-[11px] font-semibold text-gray-700">
-                                Autres candidats :
-                              </div>
-                              {p.candidates.slice(1).map((cand) => (
-                                <button
-                                  key={cand.chantierId}
-                                  onClick={() =>
-                                    pickCandidate(p.rowIndex, cand.chantierId)
-                                  }
-                                  className={`text-left w-full text-xs px-2 py-1.5 rounded border ${
-                                    pickedId === cand.chantierId
-                                      ? "border-accent bg-white"
-                                      : "border-gray-200 bg-white hover:border-gray-400"
-                                  }`}
-                                >
-                                  <span className="font-semibold">
-                                    {cand.label}
-                                  </span>{" "}
-                                  <span className="text-gray-500">
-                                    ({cand.address})
-                                  </span>{" "}
-                                  <span className="font-mono text-gray-500">
-                                    {cand.score}/100
-                                  </span>
-                                </button>
-                              ))}
+                      {p.verdict === "none" ? (
+                        <div className="text-xs text-red-700 mt-1">
+                          Aucun chantier en base ne correspond à cette adresse.
+                        </div>
+                      ) : (
+                        p.bestChantierId && (
+                          <>
+                            <div className="text-xs text-gray-600 mt-1">
+                              <span className="text-gray-400">→</span> Match :{" "}
+                              <strong>{p.bestChantierLabel}</strong>{" "}
+                              <span className="text-gray-500">
+                                ({p.bestChantierAddress})
+                              </span>
                             </div>
-                          )}
-                        </>
+
+                            {p.verdict === "review" &&
+                              p.candidates.length > 1 && (
+                                <div className="mt-2 space-y-1">
+                                  <div className="text-[11px] font-semibold text-gray-700">
+                                    Autres candidats :
+                                  </div>
+                                  {p.candidates.slice(1).map((cand) => (
+                                    <button
+                                      key={cand.chantierId}
+                                      onClick={() =>
+                                        pickCandidate(
+                                          p.rowIndex,
+                                          cand.chantierId
+                                        )
+                                      }
+                                      className={`text-left w-full text-xs px-2 py-1.5 rounded border ${
+                                        pickedId === cand.chantierId
+                                          ? "border-accent bg-white"
+                                          : "border-gray-200 bg-white hover:border-gray-400"
+                                      }`}
+                                    >
+                                      <span className="font-semibold">
+                                        {cand.label}
+                                      </span>{" "}
+                                      <span className="text-gray-500">
+                                        ({cand.address})
+                                      </span>{" "}
+                                      <span className="font-mono text-gray-500">
+                                        {cand.score}/100
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                          </>
+                        )
                       )}
 
                       <div className="mt-1 text-[11px] text-gray-500 break-all">

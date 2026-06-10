@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MatchProposal } from "@/lib/chantiers/roofr-match";
@@ -85,6 +85,8 @@ function parseCsvLine(line: string, delim: string): string[] {
 export default function ImportRoofrPage() {
   const router = useRouter();
   const [text, setText] = useState("");
+  const [fileName, setFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [matching, setMatching] = useState(false);
   const [result, setResult] = useState<MatchResult | null>(null);
   const [filter, setFilter] = useState<VerdictFilter>("all");
@@ -97,6 +99,29 @@ export default function ImportRoofrPage() {
     successCount: number;
     errorCount: number;
   } | null>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    // Read as UTF-8 (default). Google Sheets exports CSV as UTF-8.
+    const content = await file.text();
+    setText(content);
+    setResult(null);
+    setConfirmed(new Set());
+    setPickedCandidate({});
+    setApplyOutcome(null);
+  };
+
+  const clearFile = () => {
+    setText("");
+    setFileName(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setResult(null);
+    setConfirmed(new Set());
+    setPickedCandidate({});
+    setApplyOutcome(null);
+  };
 
   const filteredProposals = useMemo(() => {
     if (!result) return [];
@@ -245,9 +270,52 @@ export default function ImportRoofrPage() {
         </button>
       </div>
 
+      {/* File upload zone */}
+      <div className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-4 sm:p-6 text-center">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
+          onChange={handleFileChange}
+          className="hidden"
+          id="roofr-csv-upload"
+        />
+        {fileName ? (
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <span className="text-sm text-gray-700">
+              📄 <strong>{fileName}</strong> chargé
+            </span>
+            <button
+              onClick={clearFile}
+              className="text-xs text-gray-500 hover:text-red-600 underline-offset-2 hover:underline"
+            >
+              Retirer
+            </button>
+          </div>
+        ) : (
+          <label
+            htmlFor="roofr-csv-upload"
+            className="cursor-pointer block"
+          >
+            <div className="text-3xl mb-2">📁</div>
+            <div className="text-sm font-semibold text-gray-800">
+              Cliquer pour choisir un fichier CSV
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              ou colle directement dans la zone ci-dessous
+            </div>
+          </label>
+        )}
+      </div>
+
+      <div className="text-center text-xs text-gray-400 font-semibold">— OU —</div>
+
       <textarea
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          if (fileName) setFileName(null); // user is editing manually
+        }}
         rows={8}
         placeholder="Colle ton CSV/TSV ici…"
         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-mono focus:border-accent focus:outline-none resize-y"

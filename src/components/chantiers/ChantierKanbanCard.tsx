@@ -6,6 +6,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { COLORS } from "@/lib/colors";
 import type { Chantier } from "@/types/chantiers";
 import UrgencyBadge from "./UrgencyBadge";
+import TeamBadge from "./TeamBadge";
+import { useTeamChiefNames } from "@/lib/teams/use-teams";
 
 function formatScheduled(date?: string): string {
   if (!date) return "Non planifié";
@@ -60,6 +62,7 @@ export default function ChantierKanbanCard({ chantier, isDragOverlay }: Props) {
   const amount = formatAmount(chantier.totalAmount);
   const isPinned = chantier.priority != null;
   const isUrgent = chantier.urgency === "urgent";
+  const chiefNames = useTeamChiefNames();
 
   return (
     <div
@@ -111,8 +114,13 @@ export default function ChantierKanbanCard({ chantier, isDragOverlay }: Props) {
         {amount && <span className="font-semibold text-gray-700">{amount}</span>}
       </div>
 
-      {/* Bottom: color dot + style + send markers */}
+      {/* Bottom: team + color dot + style + send markers */}
       <div className="flex items-center gap-1.5 flex-wrap">
+        <TeamBadge
+          team={chantier.team}
+          chiefName={chantier.team ? chiefNames[chantier.team] : undefined}
+          compact
+        />
         {color && (
           <span
             className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-50 rounded text-[10px] font-semibold text-gray-700"

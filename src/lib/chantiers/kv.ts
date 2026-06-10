@@ -64,6 +64,7 @@ export async function createChantier(
     style: input.style,
     colorKey: input.colorKey?.trim() || undefined,
     urgency: input.urgency ?? "non_urgent",
+    team: input.team,
     status: "scheduled",
     signedAt: input.signedAt ?? now,
     scheduledDate: input.scheduledDate?.trim() || undefined,
@@ -185,6 +186,12 @@ export async function updateChantier(
       : patch.colorKey === null
         ? undefined
         : patch.colorKey.trim() || undefined;
+  const team =
+    patch.team === undefined
+      ? existing.team
+      : patch.team === null
+        ? undefined
+        : patch.team;
 
   const now = Date.now();
   const updated: Chantier = {
@@ -205,6 +212,7 @@ export async function updateChantier(
     style,
     colorKey,
     urgency: patch.urgency ?? existing.urgency ?? "non_urgent",
+    team,
     status: patch.status ?? existing.status,
     signedAt: patch.signedAt ?? existing.signedAt,
     scheduledDate,

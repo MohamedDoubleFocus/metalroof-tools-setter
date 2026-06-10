@@ -3,10 +3,12 @@ import { after } from "next/server";
 import { createChantier, setChantierFields } from "@/lib/chantiers/kv";
 import { normalizePhoneE164 } from "@/lib/codes";
 import { geocodeAddress } from "@/lib/chantiers/geocode";
-import type {
-  ChantierStyle,
-  ChantierUrgency,
-  CreateChantierInput,
+import {
+  CHANTIER_TEAMS,
+  type ChantierStyle,
+  type ChantierTeam,
+  type ChantierUrgency,
+  type CreateChantierInput,
 } from "@/types/chantiers";
 
 export const runtime = "nodejs";
@@ -15,6 +17,7 @@ export const maxDuration = 60;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_STYLES = new Set<ChantierStyle>(["shingle_tile", "standing_seam"]);
 const VALID_URGENCY = new Set<ChantierUrgency>(["urgent", "non_urgent"]);
+const VALID_TEAMS = new Set<ChantierTeam>(CHANTIER_TEAMS);
 
 interface BulkItem {
   clientName?: string;
@@ -27,6 +30,7 @@ interface BulkItem {
   style?: string;
   colorKey?: string;
   urgency?: string;
+  team?: string;
   signedAt?: number | string;
   scheduledDate?: string;
   totalAmount?: number;
@@ -106,6 +110,10 @@ export async function POST(request: NextRequest) {
         item.urgency && VALID_URGENCY.has(item.urgency as ChantierUrgency)
           ? (item.urgency as ChantierUrgency)
           : undefined;
+      const team =
+        item.team && VALID_TEAMS.has(item.team as ChantierTeam)
+          ? (item.team as ChantierTeam)
+          : undefined;
 
       const input: CreateChantierInput = {
         clientName,
@@ -118,6 +126,7 @@ export async function POST(request: NextRequest) {
         style,
         colorKey: item.colorKey,
         urgency,
+        team,
         signedAt,
         scheduledDate: item.scheduledDate,
         totalAmount: item.totalAmount,

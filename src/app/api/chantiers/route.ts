@@ -7,13 +7,18 @@ import {
 } from "@/lib/chantiers/kv";
 import { normalizePhoneE164 } from "@/lib/codes";
 import { geocodeAddress } from "@/lib/chantiers/geocode";
-import type { CreateChantierInput } from "@/types/chantiers";
+import {
+  CHANTIER_TEAMS,
+  type ChantierTeam,
+  type CreateChantierInput,
+} from "@/types/chantiers";
 
 export const runtime = "nodejs";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_STYLES = new Set(["shingle_tile", "standing_seam"]);
 const VALID_URGENCY = new Set(["urgent", "non_urgent"]);
+const VALID_TEAMS = new Set<ChantierTeam>(CHANTIER_TEAMS);
 
 export async function GET() {
   try {
@@ -88,6 +93,10 @@ export async function POST(request: NextRequest) {
     body.style && VALID_STYLES.has(body.style) ? body.style : undefined;
   const urgency =
     body.urgency && VALID_URGENCY.has(body.urgency) ? body.urgency : undefined;
+  const team =
+    body.team && VALID_TEAMS.has(body.team as ChantierTeam)
+      ? (body.team as ChantierTeam)
+      : undefined;
 
   try {
     const chantier = await createChantier({
@@ -101,6 +110,7 @@ export async function POST(request: NextRequest) {
       style,
       colorKey: body.colorKey,
       urgency,
+      team,
       signedAt: body.signedAt,
       scheduledDate: body.scheduledDate,
       priority: body.priority,

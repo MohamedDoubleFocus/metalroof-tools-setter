@@ -16,6 +16,19 @@ export type ChantierStyle = Extract<RoofStyle, "shingle_tile" | "standing_seam">
 
 export type ChantierUrgency = "urgent" | "non_urgent";
 
+/**
+ * Field crews that handle installations. Keep this list in sync with
+ * TEAM_KEYS in src/components/chantiers/TeamBadge.tsx (the source of truth
+ * for the UI).
+ */
+export type ChantierTeam = "Nikita" | "MAX" | "PAVEL" | "OMAR";
+export const CHANTIER_TEAMS: readonly ChantierTeam[] = [
+  "Nikita",
+  "MAX",
+  "PAVEL",
+  "OMAR",
+];
+
 export interface Chantier {
   id: string;
 
@@ -36,6 +49,8 @@ export interface Chantier {
   style?: ChantierStyle;
   colorKey?: string; // matches a key in src/lib/colors.ts COLORS
   urgency: ChantierUrgency;
+  /** Field crew assigned to this jobsite. */
+  team?: ChantierTeam;
 
   // ─── Workflow ────────────────────────────────────────────────────
   status: ChantierStatus;
@@ -76,6 +91,7 @@ export interface CreateChantierInput {
   style?: ChantierStyle;
   colorKey?: string;
   urgency?: ChantierUrgency;
+  team?: ChantierTeam;
   signedAt?: number;
   scheduledDate?: string;
   priority?: number;
@@ -94,6 +110,7 @@ export interface UpdateChantierInput {
   style?: ChantierStyle | null;
   colorKey?: string | null;
   urgency?: ChantierUrgency;
+  team?: ChantierTeam | null;
   status?: ChantierStatus;
   signedAt?: number;
   scheduledDate?: string | null;

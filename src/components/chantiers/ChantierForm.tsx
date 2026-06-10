@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { COLORS, COLOR_KEYS } from "@/lib/colors";
-import type { ChantierStyle, ChantierUrgency } from "@/types/chantiers";
+import {
+  CHANTIER_TEAMS,
+  type ChantierStyle,
+  type ChantierTeam,
+  type ChantierUrgency,
+} from "@/types/chantiers";
+import { useTeamChiefNames } from "@/lib/teams/use-teams";
 
 interface FormState {
   clientName: string;
@@ -16,6 +22,7 @@ interface FormState {
   style: "" | ChantierStyle;
   colorKey: string;
   urgency: ChantierUrgency;
+  team: "" | ChantierTeam;
   signedAt: string; // YYYY-MM-DD
   scheduledDate: string; // YYYY-MM-DD
   totalAmount: string;
@@ -33,6 +40,7 @@ const EMPTY: FormState = {
   style: "",
   colorKey: "",
   urgency: "non_urgent",
+  team: "",
   signedAt: new Date().toISOString().slice(0, 10),
   scheduledDate: "",
   totalAmount: "",
@@ -41,6 +49,7 @@ const EMPTY: FormState = {
 
 export default function ChantierForm() {
   const router = useRouter();
+  const chiefNames = useTeamChiefNames();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +76,7 @@ export default function ChantierForm() {
           style: form.style || undefined,
           colorKey: form.colorKey || undefined,
           urgency: form.urgency,
+          team: form.team || undefined,
           signedAt: form.signedAt
             ? Date.parse(`${form.signedAt}T12:00:00`)
             : undefined,
@@ -248,6 +258,43 @@ export default function ChantierForm() {
                 }`}
               >
                 {u === "urgent" ? "🔥 Urgent" : "Non urgent"}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-1">
+          Équipe attribuée (optionnel)
+        </label>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => update("team", "")}
+            className={`px-3 py-2 rounded-xl text-sm font-semibold ${
+              !form.team
+                ? "bg-gray-700 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            Aucune
+          </button>
+          {CHANTIER_TEAMS.map((t) => {
+            const active = form.team === t;
+            const display = chiefNames[t] || t;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => update("team", t)}
+                className={`px-3 py-2 rounded-xl text-sm font-semibold border-2 ${
+                  active
+                    ? "border-accent bg-white text-gray-900"
+                    : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-400"
+                }`}
+              >
+                {display}
               </button>
             );
           })}

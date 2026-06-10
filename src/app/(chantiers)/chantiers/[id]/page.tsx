@@ -7,12 +7,16 @@ import ChantierStatusBadge from "@/components/chantiers/ChantierStatusBadge";
 import ChantierActions from "@/components/chantiers/ChantierActions";
 import ChantierTimeline from "@/components/chantiers/ChantierTimeline";
 import UrgencyBadge from "@/components/chantiers/UrgencyBadge";
+import TeamBadge from "@/components/chantiers/TeamBadge";
+import { useTeamChiefNames } from "@/lib/teams/use-teams";
 import { COLORS, COLOR_KEYS } from "@/lib/colors";
-import type {
-  Chantier,
-  ChantierStatus,
-  ChantierStyle,
-  ChantierUrgency,
+import {
+  CHANTIER_TEAMS,
+  type Chantier,
+  type ChantierStatus,
+  type ChantierStyle,
+  type ChantierTeam,
+  type ChantierUrgency,
 } from "@/types/chantiers";
 
 const STATUSES: ChantierStatus[] = ["scheduled", "in_progress", "done"];
@@ -37,6 +41,7 @@ export default function ChantierDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingField, setSavingField] = useState<string | null>(null);
+  const chiefNames = useTeamChiefNames();
 
   useEffect(() => {
     if (!id) return;
@@ -141,6 +146,10 @@ export default function ChantierDetailPage() {
           </h1>
           <ChantierStatusBadge status={chantier.status} />
           <UrgencyBadge urgency={chantier.urgency} />
+          <TeamBadge
+            team={chantier.team}
+            chiefName={chantier.team ? chiefNames[chantier.team] : undefined}
+          />
         </div>
         <div className="text-sm text-gray-700">
           {chantier.addressLine1}
@@ -427,6 +436,43 @@ export default function ChantierDetailPage() {
                   }`}
                 >
                   {u === "urgent" ? "🔥 Urgent" : "Non urgent"}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <div className="font-semibold text-gray-700 mb-1 text-sm">
+            Équipe attribuée
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => patch("team", { team: null })}
+              disabled={savingField === "team"}
+              className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                !chantier.team
+                  ? "bg-gray-700 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Aucune
+            </button>
+            {CHANTIER_TEAMS.map((t) => {
+              const active = chantier.team === t;
+              const display = chiefNames[t] || t;
+              return (
+                <button
+                  key={t}
+                  onClick={() => patch("team", { team: t })}
+                  disabled={savingField === "team"}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors border-2 ${
+                    active
+                      ? "border-accent bg-white text-gray-900"
+                      : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-400"
+                  }`}
+                >
+                  {display}
                 </button>
               );
             })}

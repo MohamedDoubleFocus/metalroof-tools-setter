@@ -1,13 +1,19 @@
 "use client";
 
 import { COLORS, COLOR_KEYS } from "@/lib/colors";
-import type { Chantier } from "@/types/chantiers";
+import {
+  CHANTIER_TEAMS,
+  type Chantier,
+  type ChantierTeam,
+} from "@/types/chantiers";
+import { useTeamChiefNames } from "@/lib/teams/use-teams";
 
 export interface FiltersState {
   search: string;
   style: "all" | "shingle_tile" | "standing_seam";
   colorKey: "all" | string;
   urgency: "all" | "urgent" | "non_urgent";
+  team: "all" | "unassigned" | ChantierTeam;
 }
 
 export const EMPTY_FILTERS: FiltersState = {
@@ -15,6 +21,7 @@ export const EMPTY_FILTERS: FiltersState = {
   style: "all",
   colorKey: "all",
   urgency: "all",
+  team: "all",
 };
 
 export function applyFilters(
@@ -30,6 +37,13 @@ export function applyFilters(
   }
   if (filters.urgency !== "all") {
     out = out.filter((c) => c.urgency === filters.urgency);
+  }
+  if (filters.team !== "all") {
+    if (filters.team === "unassigned") {
+      out = out.filter((c) => !c.team);
+    } else {
+      out = out.filter((c) => c.team === filters.team);
+    }
   }
   const q = filters.search.trim().toLowerCase();
   if (q) {
@@ -57,11 +71,13 @@ interface Props {
 }
 
 export default function ChantierFilters({ value, onChange }: Props) {
+  const chiefNames = useTeamChiefNames();
   const hasFilters =
     value.search ||
     value.style !== "all" ||
     value.colorKey !== "all" ||
-    value.urgency !== "all";
+    value.urgency !== "all" ||
+    value.team !== "all";
 
   return (
     <div className="bg-white border-2 border-gray-200 rounded-2xl p-3 space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-2 sm:flex-wrap">
@@ -73,7 +89,27 @@ export default function ChantierFilters({ value, onChange }: Props) {
         className="w-full sm:flex-1 sm:min-w-[200px] px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
       />
 
-      <div className="grid grid-cols-3 sm:flex sm:items-center sm:gap-2 gap-2">
+      <div className="grid grid-cols-2 sm:flex sm:items-center sm:gap-2 gap-2">
+        <select
+          value={value.team}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              team: e.target.value as FiltersState["team"],
+            })
+          }
+          className="px-2 sm:px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm bg-white focus:border-accent focus:outline-none min-w-0"
+        >
+          <option value="all">Toutes équipes</option>
+          <option value="unassigned">Non attribué</option>
+          {CHANTIER_TEAMS.map((t) => (
+            <option key={t} value={t}>
+              {chiefNames[t] || t}
+            </option>
+          ))}
+        </select>
+
+
         <select
           value={value.style}
           onChange={(e) =>

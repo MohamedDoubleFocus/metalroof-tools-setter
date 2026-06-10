@@ -3,13 +3,19 @@ import { after } from "next/server";
 import { createChantier, setChantierFields } from "@/lib/chantiers/kv";
 import { normalizePhoneE164 } from "@/lib/codes";
 import { geocodeAddress } from "@/lib/chantiers/geocode";
-import type { ChantierStyle, ChantierUrgency } from "@/types/chantiers";
+import {
+  CHANTIER_TEAMS,
+  type ChantierStyle,
+  type ChantierTeam,
+  type ChantierUrgency,
+} from "@/types/chantiers";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const VALID_STYLES = new Set<ChantierStyle>(["shingle_tile", "standing_seam"]);
 const VALID_URGENCY = new Set<ChantierUrgency>(["urgent", "non_urgent"]);
+const VALID_TEAMS = new Set<ChantierTeam>(CHANTIER_TEAMS);
 
 /**
  * POST /api/webhooks/create-chantier
@@ -60,6 +66,7 @@ export async function POST(request: NextRequest) {
     style?: string;
     colorKey?: string;
     urgency?: string;
+    team?: string;
     signedAt?: number | string;
     scheduledDate?: string;
     priority?: number;
@@ -122,6 +129,10 @@ export async function POST(request: NextRequest) {
     body.urgency && VALID_URGENCY.has(body.urgency as ChantierUrgency)
       ? (body.urgency as ChantierUrgency)
       : undefined;
+  const team =
+    body.team && VALID_TEAMS.has(body.team as ChantierTeam)
+      ? (body.team as ChantierTeam)
+      : undefined;
 
   try {
     const chantier = await createChantier({
@@ -135,6 +146,7 @@ export async function POST(request: NextRequest) {
       style,
       colorKey: body.colorKey,
       urgency,
+      team,
       signedAt,
       scheduledDate: body.scheduledDate,
       priority: body.priority,

@@ -58,6 +58,12 @@ export default function ChantiersKanbanPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <Link
+            href="/chantiers/teams"
+            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-xs sm:text-sm hover:border-accent hover:text-accent"
+          >
+            👥 Équipes
+          </Link>
+          <Link
             href="/chantiers/import-roofr"
             className="px-3 sm:px-4 py-2 sm:py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-xs sm:text-sm hover:border-accent hover:text-accent"
           >

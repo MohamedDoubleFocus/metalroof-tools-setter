@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import type { Chantier } from "@/types/chantiers";
 import ChantierStatusBadge from "./ChantierStatusBadge";
 import UrgencyBadge from "./UrgencyBadge";
+import TeamBadge from "./TeamBadge";
 import { COLORS } from "@/lib/colors";
+import { useTeamChiefNames } from "@/lib/teams/use-teams";
 
 function formatDate(ts: number | undefined): string {
   if (!ts) return "—";
@@ -39,6 +43,7 @@ interface Props {
 
 export default function ChantierCard({ chantier, queuePosition }: Props) {
   const isUrgent = chantier.urgency === "urgent";
+  const chiefNames = useTeamChiefNames();
   return (
     <Link
       href={`/chantiers/${chantier.id}`}
@@ -62,6 +67,11 @@ export default function ChantierCard({ chantier, queuePosition }: Props) {
             </h3>
             <ChantierStatusBadge status={chantier.status} />
             <UrgencyBadge urgency={chantier.urgency} />
+            <TeamBadge
+              team={chantier.team}
+              chiefName={chantier.team ? chiefNames[chantier.team] : undefined}
+              compact
+            />
             {chantier.colorKey && COLORS[chantier.colorKey] && (
               <span
                 className="inline-block w-3 h-3 rounded-full border border-gray-300"

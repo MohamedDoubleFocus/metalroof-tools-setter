@@ -1,15 +1,11 @@
 /**
- * Redis storage for the roofing-report ordering module.
+ * Supabase Postgres storage for the roofing-report ordering module.
  *
- * Schema:
- *   report-order:<id>                → ReportOrder (persistent, no TTL)
- *   report-orders:all                → string[] of all order IDs
- *   report-orders:by-status:<status> → string[] of IDs in that status
- *
- * Reuses the singleton Redis client + JSON helpers from src/lib/kv.ts.
+ * Schema: see supabase/migrations/0001_initial.sql (table `report_orders`).
+ * Public API (signatures) is preserved 1:1 from the previous Redis impl.
  */
 
-import { getJson, setJsonPersistent, delKey } from "@/lib/kv";
+import { supabase } from "@/lib/supabase";
 import type {
   CreateReportOrderInput,
   ReportOrder,
@@ -17,14 +13,7 @@ import type {
   UpdateReportOrderInput,
 } from "@/types/reports";
 
-// ─── Keys ────────────────────────────────────────────────────────────────
-
-const orderKey = (id: string) => `report-order:${id}`;
-const allOrdersKey = () => `report-orders:all`;
-const byStatusKey = (status: ReportStatus) =>
-  `report-orders:by-status:${status}`;
-
-// ─── Helpers ─────────────────────────────────────────────────────────────
+const TABLE = "report_orders";
 
 function newId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -33,22 +22,64 @@ function newId(): string {
   return `ro-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-async function pushToList(key: string, value: string): Promise<void> {
-  const list = (await getJson<string[]>(key)) ?? [];
-  if (!list.includes(value)) list.push(value);
-  await setJsonPersistent(key, list);
+interface ReportOrderRow {
+  id: string;
+  closer_label: string;
+  client_phone: string | null;
+  created_by_label: string | null;
+  address: string;
+  lat: number | null;
+  lng: number | null;
+  notes: string | null;
+  reference_photos: string[];
+  status: string;
+  pdf_url: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
 }
 
-async function removeFromList(key: string, value: string): Promise<void> {
-  const list = (await getJson<string[]>(key)) ?? [];
-  await setJsonPersistent(
-    key,
-    list.filter((v) => v !== value)
-  );
+const tsOrUndef = (v: string | null) => (v ? new Date(v).getTime() : undefined);
+const strOrUndef = (v: string | null) => v ?? undefined;
+const isoOrNull = (v: number | undefined) =>
+  v !== undefined ? new Date(v).toISOString() : null;
+
+function rowToReportOrder(row: ReportOrderRow): ReportOrder {
+  return {
+    id: row.id,
+    closerLabel: row.closer_label,
+    clientPhone: strOrUndef(row.client_phone),
+    createdByLabel: strOrUndef(row.created_by_label),
+    address: row.address,
+    lat: row.lat ?? undefined,
+    lng: row.lng ?? undefined,
+    notes: strOrUndef(row.notes),
+    referencePhotos: row.reference_photos ?? [],
+    status: row.status as ReportStatus,
+    pdfUrl: strOrUndef(row.pdf_url),
+    createdAt: new Date(row.created_at).getTime(),
+    updatedAt: new Date(row.updated_at).getTime(),
+    completedAt: tsOrUndef(row.completed_at),
+  };
 }
 
-async function getList(key: string): Promise<string[]> {
-  return (await getJson<string[]>(key)) ?? [];
+function reportOrderToRow(o: ReportOrder) {
+  return {
+    id: o.id,
+    closer_label: o.closerLabel,
+    client_phone: o.clientPhone ?? null,
+    created_by_label: o.createdByLabel ?? null,
+    address: o.address,
+    lat: o.lat ?? null,
+    lng: o.lng ?? null,
+    notes: o.notes ?? null,
+    reference_photos: o.referencePhotos ?? [],
+    status: o.status,
+    pdf_url: o.pdfUrl ?? null,
+    created_at: new Date(o.createdAt).toISOString(),
+    updated_at: new Date(o.updatedAt).toISOString(),
+    completed_at: isoOrNull(o.completedAt),
+  };
 }
 
 // ─── CRUD ────────────────────────────────────────────────────────────────
@@ -73,36 +104,41 @@ export async function createReportOrder(
     updatedAt: now,
   };
 
-  await setJsonPersistent(orderKey(id), order);
-  await pushToList(allOrdersKey(), id);
-  await pushToList(byStatusKey("pending"), id);
-
+  const { error } = await supabase.from(TABLE).insert(reportOrderToRow(order));
+  if (error) throw new Error(`createReportOrder: ${error.message}`);
   return order;
 }
 
 export async function getReportOrder(id: string): Promise<ReportOrder | null> {
-  return getJson<ReportOrder>(orderKey(id));
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`getReportOrder: ${error.message}`);
+  return data ? rowToReportOrder(data as ReportOrderRow) : null;
 }
 
 export async function listAllReportOrders(): Promise<ReportOrder[]> {
-  const ids = await getList(allOrdersKey());
-  if (ids.length === 0) return [];
-  const orders = await Promise.all(ids.map((id) => getReportOrder(id)));
-  return orders.filter((o): o is ReportOrder => o !== null);
+  const { data, error } = await supabase.from(TABLE).select("*");
+  if (error) throw new Error(`listAllReportOrders: ${error.message}`);
+  return (data as ReportOrderRow[]).map(rowToReportOrder);
 }
 
 export async function listReportOrdersByStatus(
   status: ReportStatus
 ): Promise<ReportOrder[]> {
-  const ids = await getList(byStatusKey(status));
-  if (ids.length === 0) return [];
-  const orders = await Promise.all(ids.map((id) => getReportOrder(id)));
-  return orders.filter((o): o is ReportOrder => o !== null);
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("status", status);
+  if (error) throw new Error(`listReportOrdersByStatus: ${error.message}`);
+  return (data as ReportOrderRow[]).map(rowToReportOrder);
 }
 
 /**
- * Generic update — pass any subset of mutable fields.
- * Maintains the by-status indexes if status changes.
+ * Generic update — pass any subset of mutable fields. Maintains completedAt
+ * audit timestamp when status transitions to "ready".
  */
 export async function updateReportOrder(
   id: string,
@@ -125,21 +161,14 @@ export async function updateReportOrder(
         : existing.completedAt,
   };
 
-  await setJsonPersistent(orderKey(id), updated);
-
-  // Maintain by-status index
-  if (patch.status && patch.status !== existing.status) {
-    await removeFromList(byStatusKey(existing.status), id);
-    await pushToList(byStatusKey(patch.status), id);
-  }
-
+  const { error } = await supabase
+    .from(TABLE)
+    .update(reportOrderToRow(updated))
+    .eq("id", id);
+  if (error) throw new Error(`updateReportOrder: ${error.message}`);
   return updated;
 }
 
-/**
- * Attach the freelancer-uploaded PDF and flip status to "ready".
- * Convenience wrapper around updateReportOrder.
- */
 export async function attachReportPdf(
   id: string,
   pdfUrl: string
@@ -148,11 +177,10 @@ export async function attachReportPdf(
 }
 
 export async function deleteReportOrder(id: string): Promise<boolean> {
-  const order = await getReportOrder(id);
-  if (!order) return false;
-
-  await delKey(orderKey(id));
-  await removeFromList(allOrdersKey(), id);
-  await removeFromList(byStatusKey(order.status), id);
-  return true;
+  const { error, count } = await supabase
+    .from(TABLE)
+    .delete({ count: "exact" })
+    .eq("id", id);
+  if (error) throw new Error(`deleteReportOrder: ${error.message}`);
+  return (count ?? 0) > 0;
 }

@@ -43,12 +43,13 @@ export async function createServerSupabase() {
   const url = getEnv("SUPABASE_URL");
   // Anon publishable key — safe to use here, the session cookie is the auth token.
   const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     process.env.SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     process.env.SUPABASE_PUBLISHABLE_KEY;
   if (!anonKey) {
     throw new Error(
-      "SUPABASE_ANON_KEY (ou NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) non configuré"
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY non configuré"
     );
   }
 
@@ -84,12 +85,13 @@ export function createMiddlewareSupabase(
 ) {
   const url = getEnv("SUPABASE_URL");
   const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     process.env.SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     process.env.SUPABASE_PUBLISHABLE_KEY;
   if (!anonKey) {
     throw new Error(
-      "SUPABASE_ANON_KEY (ou NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) non configuré"
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY non configuré"
     );
   }
 

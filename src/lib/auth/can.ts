@@ -81,6 +81,18 @@ export function respondError(err: unknown): NextResponse {
  * prefix (the API routes do their own fine-grained checks via require*).
  */
 export function canAccess(role: UserRole, pathname: string): boolean {
+  // Universally allowed for any signed-in user: profile lookup, auth pages.
+  // /api/me is read by every client component for role-gating UI — blocking it
+  // for foreman/SDR breaks the entire role-conditional UI tree.
+  if (
+    pathname === "/api/me" ||
+    pathname === "/login" ||
+    pathname.startsWith("/logout") ||
+    pathname.startsWith("/auth/")
+  ) {
+    return true;
+  }
+
   // Admin sees everything.
   if (role === "admin") return true;
 
@@ -90,9 +102,7 @@ export function canAccess(role: UserRole, pathname: string): boolean {
       pathname === "/" || // gets redirected to /chantiers below; allow render
       pathname.startsWith("/chantiers") ||
       pathname.startsWith("/api/chantiers") ||
-      pathname.startsWith("/api/teams") || // foreman needs to read teams for filter display
-      pathname.startsWith("/logout") ||
-      pathname === "/login"
+      pathname.startsWith("/api/teams") // foreman needs to read teams for filter display
     );
   }
 
@@ -101,9 +111,7 @@ export function canAccess(role: UserRole, pathname: string): boolean {
     return (
       pathname === "/" ||
       pathname.startsWith("/prospection") ||
-      pathname.startsWith("/api/prospection") ||
-      pathname.startsWith("/logout") ||
-      pathname === "/login"
+      pathname.startsWith("/api/prospection")
     );
   }
 

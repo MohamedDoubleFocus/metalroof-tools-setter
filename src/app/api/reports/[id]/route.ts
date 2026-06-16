@@ -92,7 +92,18 @@ export async function PATCH(
     patch = body as UpdateReportOrderInput;
   }
 
-  const updated = await updateReportOrder(id, patch);
+  let updated;
+  try {
+    updated = await updateReportOrder(id, patch);
+  } catch (err) {
+    console.error("[reports PATCH] updateReportOrder failed:", err);
+    return NextResponse.json(
+      {
+        error: err instanceof Error ? err.message : "Update failed",
+      },
+      { status: 500 }
+    );
+  }
   if (!updated) {
     return NextResponse.json({ error: "Commande introuvable" }, { status: 404 });
   }

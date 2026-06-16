@@ -17,7 +17,6 @@ import {
   type Chantier,
   type ChantierStatus,
   type ChantierStyle,
-  type ChantierTeam,
   type ChantierUrgency,
 } from "@/types/chantiers";
 

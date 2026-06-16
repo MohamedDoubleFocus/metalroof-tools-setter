@@ -5,7 +5,6 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { COLORS } from "@/lib/colors";
 import type { Chantier } from "@/types/chantiers";
-import UrgencyBadge from "./UrgencyBadge";
 import TeamBadge from "./TeamBadge";
 import { useTeamChiefNames } from "@/lib/teams/use-teams";
 

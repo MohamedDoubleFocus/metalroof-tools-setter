@@ -137,7 +137,6 @@ export async function POST(request: NextRequest) {
   const url = `${baseUrl.replace(/\/$/, "")}/client/${code}`;
 
   // ─── 5. Send SMS via OpenPhone ─────────────────────────────────────────
-  const firstName = clientName.split(/\s+/)[0] || "client";
   const smsContent = `Merci de nous faire confiance pour votre projet de toiture métallique ! Voici votre lien pour créer une simulation personnalisée de votre maison :\n${url}\nLe lien expire dans 7 jours.`;
 
   const smsResult = await sendSms({ to: normalizedPhone, content: smsContent });

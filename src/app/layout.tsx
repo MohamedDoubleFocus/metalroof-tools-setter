@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import NavHeader from "@/components/shared/NavHeader";
+import UserTopBar from "@/components/shared/UserTopBar";
+import { I18nProvider } from "@/lib/i18n/context";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,8 +18,11 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className="bg-gray-50 min-h-screen" suppressHydrationWarning>
-        <NavHeader />
-        {children}
+        <I18nProvider>
+          <NavHeader />
+          <UserTopBar />
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

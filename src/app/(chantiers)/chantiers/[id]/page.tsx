@@ -11,6 +11,7 @@ import TeamBadge from "@/components/chantiers/TeamBadge";
 import ChantierPhotos from "@/components/chantiers/ChantierPhotos";
 import { useTeamChiefNames } from "@/lib/teams/use-teams";
 import { useMyProfile } from "@/lib/auth/use-me";
+import { useT } from "@/lib/i18n/context";
 import { COLORS, COLOR_KEYS } from "@/lib/colors";
 import {
   CHANTIER_TEAMS,
@@ -22,18 +23,17 @@ import {
 
 const STATUSES: ChantierStatus[] = ["scheduled", "in_progress", "done"];
 
-const STATUS_LABEL: Record<ChantierStatus, string> = {
-  scheduled: "Planifié",
-  in_progress: "En cours",
-  done: "Terminé",
-};
-
-const STYLE_LABEL: Record<ChantierStyle, string> = {
-  shingle_tile: "Style européen",
-  standing_seam: "Joint debout",
-};
-
 export default function ChantierDetailPage() {
+  const { t } = useT();
+  const STATUS_LABEL: Record<ChantierStatus, string> = {
+    scheduled: t("chantier.status.scheduled"),
+    in_progress: t("chantier.status.in_progress"),
+    done: t("chantier.status.done"),
+  };
+  const STYLE_LABEL: Record<ChantierStyle, string> = {
+    shingle_tile: t("chantier.style.shingle_tile"),
+    standing_seam: t("chantier.style.standing_seam"),
+  };
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params?.id as string;
@@ -95,12 +95,7 @@ export default function ChantierDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (
-      !window.confirm(
-        "Supprimer définitivement ce chantier ? Cette action ne peut pas être annulée."
-      )
-    )
-      return;
+    if (!window.confirm(t("chantier.delete.confirm"))) return;
     const res = await fetch(`/api/chantiers/${id}`, { method: "DELETE" });
     if (res.ok) {
       router.push("/chantiers");
@@ -110,19 +105,19 @@ export default function ChantierDetailPage() {
   };
 
   if (loading) {
-    return <div className="text-center py-10 text-gray-400">Chargement...</div>;
+    return <div className="text-center py-10 text-gray-400">{t("common.loading")}</div>;
   }
   if (error || !chantier) {
     return (
       <div className="max-w-xl mx-auto">
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
-          {error || "Chantier introuvable"}
+          {error || t("chantier.notFound")}
         </div>
         <Link
           href="/chantiers"
           className="block mt-4 text-sm text-gray-500 hover:text-gray-700"
         >
-          ← Retour à la liste
+          {t("chantier.back")}
         </Link>
       </div>
     );
@@ -135,7 +130,7 @@ export default function ChantierDetailPage() {
           href="/chantiers"
           className="text-sm text-gray-500 hover:text-gray-700"
         >
-          ← Retour à la liste
+          {t("chantier.back")}
         </Link>
       </div>
 
@@ -182,7 +177,7 @@ export default function ChantierDetailPage() {
               ✉️ {chantier.clientEmail}
             </a>
           ) : (
-            <span className="text-gray-400 italic">✉️ pas d&apos;email</span>
+            <span className="text-gray-400 italic">{t("chantier.noEmail")}</span>
           )}
         </div>
       </div>
@@ -193,7 +188,7 @@ export default function ChantierDetailPage() {
       {/* ─── Actions (admin only) ───────────────────────────────── */}
       {isAdmin && (
       <div className="bg-white border-2 border-gray-200 rounded-2xl p-5">
-        <h2 className="text-sm font-bold text-gray-700 mb-3">Actions</h2>
+        <h2 className="text-sm font-bold text-gray-700 mb-3">{t("chantier.section.actions")}</h2>
         <ChantierActions chantier={chantier} onChange={setChantier} />
         {chantier.invoicePdfUrl && (
           <a
@@ -202,7 +197,7 @@ export default function ChantierDetailPage() {
             rel="noopener noreferrer"
             className="block mt-3 text-sm text-accent hover:underline text-center"
           >
-            📄 Re-télécharger la facture envoyée
+            {t("chantier.invoice.redownload")}
           </a>
         )}
       </div>
@@ -210,10 +205,10 @@ export default function ChantierDetailPage() {
 
       {/* ─── Editable client info ────────────────────────────────── */}
       <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 space-y-4">
-        <h2 className="text-sm font-bold text-gray-700">Infos client</h2>
+        <h2 className="text-sm font-bold text-gray-700">{t("chantier.section.client")}</h2>
 
         <label className="text-sm block">
-          <div className="font-semibold text-gray-700 mb-1">Nom complet</div>
+          <div className="font-semibold text-gray-700 mb-1">{t("chantier.field.fullName")}</div>
           <input
             type="text"
             value={chantier.clientName}
@@ -224,14 +219,14 @@ export default function ChantierDetailPage() {
               const v = e.target.value.trim();
               if (v) patch("clientName", { clientName: v });
             }}
-            disabled={savingField === "clientName"}
+            disabled={readOnly || savingField === "clientName"}
             className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
           />
         </label>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="text-sm">
-            <div className="font-semibold text-gray-700 mb-1">Téléphone</div>
+            <div className="font-semibold text-gray-700 mb-1">{t("chantier.field.phone")}</div>
             <input
               type="tel"
               value={chantier.clientPhone}
@@ -242,14 +237,14 @@ export default function ChantierDetailPage() {
                 const v = e.target.value.trim();
                 if (v) patch("clientPhone", { clientPhone: v });
               }}
-              disabled={savingField === "clientPhone"}
+              disabled={readOnly || savingField === "clientPhone"}
               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
             />
           </label>
 
           <label className="text-sm">
             <div className="font-semibold text-gray-700 mb-1">
-              Email (optionnel)
+              {t("chantier.field.email")}
             </div>
             <input
               type="email"
@@ -263,7 +258,7 @@ export default function ChantierDetailPage() {
                   clientEmail: e.target.value || null,
                 })
               }
-              disabled={savingField === "clientEmail"}
+              disabled={readOnly || savingField === "clientEmail"}
               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
             />
           </label>
@@ -271,7 +266,7 @@ export default function ChantierDetailPage() {
 
         <label className="text-sm block">
           <div className="font-semibold text-gray-700 mb-1">
-            Adresse (rue + numéro)
+            {t("chantier.field.address")}
           </div>
           <input
             type="text"
@@ -283,14 +278,14 @@ export default function ChantierDetailPage() {
               const v = e.target.value.trim();
               if (v) patch("addressLine1", { addressLine1: v });
             }}
-            disabled={savingField === "addressLine1"}
+            disabled={readOnly || savingField === "addressLine1"}
             className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
           />
         </label>
 
         <label className="text-sm block">
           <div className="font-semibold text-gray-700 mb-1">
-            Ville, province, code postal (optionnel)
+            {t("chantier.field.cityPostal")}
           </div>
           <input
             type="text"
@@ -304,7 +299,7 @@ export default function ChantierDetailPage() {
                 addressLine2: e.target.value || null,
               })
             }
-            disabled={savingField === "addressLine2"}
+            disabled={readOnly || savingField === "addressLine2"}
             className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
           />
         </label>
@@ -312,13 +307,13 @@ export default function ChantierDetailPage() {
 
       {/* ─── Project details (style + couleur + soumission + urgence) ─── */}
       <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 space-y-4">
-        <h2 className="text-sm font-bold text-gray-700">Détails projet</h2>
+        <h2 className="text-sm font-bold text-gray-700">{t("chantier.section.project")}</h2>
 
         <div className={hideSubmission ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
           {!hideSubmission && (
           <label className="text-sm block">
             <div className="font-semibold text-gray-700 mb-1">
-              Lien vers la soumission
+              {t("chantier.field.submission")}
             </div>
             <input
               type="url"
@@ -342,14 +337,14 @@ export default function ChantierDetailPage() {
                 rel="noopener noreferrer"
                 className="inline-block mt-1 text-xs text-accent hover:underline"
               >
-                Ouvrir la soumission ↗
+                {t("chantier.openSubmission")}
               </a>
             )}
           </label>
           )}
 
           <label className="text-sm block">
-            <div className="font-semibold text-gray-700 mb-1">Lien Roofr</div>
+            <div className="font-semibold text-gray-700 mb-1">{t("chantier.field.roofr")}</div>
             <input
               type="url"
               value={chantier.roofrUrl ?? ""}
@@ -362,7 +357,7 @@ export default function ChantierDetailPage() {
                   roofrUrl: e.target.value || null,
                 })
               }
-              disabled={savingField === "roofrUrl"}
+              disabled={readOnly || savingField === "roofrUrl"}
               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
             />
             {chantier.roofrUrl && (
@@ -372,7 +367,7 @@ export default function ChantierDetailPage() {
                 rel="noopener noreferrer"
                 className="inline-block mt-1 text-xs text-accent hover:underline"
               >
-                Ouvrir le rapport Roofr ↗
+                {t("chantier.openRoofr")}
               </a>
             )}
           </label>
@@ -380,7 +375,7 @@ export default function ChantierDetailPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="text-sm">
-            <div className="font-semibold text-gray-700 mb-1">Style</div>
+            <div className="font-semibold text-gray-700 mb-1">{t("chantier.field.style")}</div>
             <select
               value={chantier.style ?? ""}
               onChange={(e) => {
@@ -389,10 +384,10 @@ export default function ChantierDetailPage() {
                   style: v ? (v as ChantierStyle) : null,
                 });
               }}
-              disabled={savingField === "style"}
+              disabled={readOnly || savingField === "style"}
               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none bg-white"
             >
-              <option value="">Non choisi</option>
+              <option value="">{t("chantier.notChosen")}</option>
               {(Object.keys(STYLE_LABEL) as ChantierStyle[]).map((s) => (
                 <option key={s} value={s}>
                   {STYLE_LABEL[s]}
@@ -402,17 +397,17 @@ export default function ChantierDetailPage() {
           </label>
 
           <label className="text-sm">
-            <div className="font-semibold text-gray-700 mb-1">Couleur</div>
+            <div className="font-semibold text-gray-700 mb-1">{t("chantier.field.color")}</div>
             <select
               value={chantier.colorKey ?? ""}
               onChange={(e) => {
                 const v = e.target.value;
                 patch("colorKey", { colorKey: v || null });
               }}
-              disabled={savingField === "colorKey"}
+              disabled={readOnly || savingField === "colorKey"}
               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none bg-white"
             >
-              <option value="">Non choisie</option>
+              <option value="">{t("chantier.colorNotChosen")}</option>
               {COLOR_KEYS.map((key) => (
                 <option key={key} value={key}>
                   {COLORS[key].frenchName} ({COLORS[key].ral})
@@ -432,7 +427,7 @@ export default function ChantierDetailPage() {
         </div>
 
         <div>
-          <div className="font-semibold text-gray-700 mb-1 text-sm">Urgence</div>
+          <div className="font-semibold text-gray-700 mb-1 text-sm">{t("chantier.field.urgency")}</div>
           <div className="flex items-center gap-2">
             {(["urgent", "non_urgent"] as ChantierUrgency[]).map((u) => {
               const active = chantier.urgency === u;
@@ -440,7 +435,7 @@ export default function ChantierDetailPage() {
                 <button
                   key={u}
                   onClick={() => patch("urgency", { urgency: u })}
-                  disabled={savingField === "urgency"}
+                  disabled={readOnly || savingField === "urgency"}
                   className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
                     active
                       ? u === "urgent"
@@ -449,7 +444,7 @@ export default function ChantierDetailPage() {
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
-                  {u === "urgent" ? "🔥 Urgent" : "Non urgent"}
+                  {u === "urgent" ? t("chantier.urgency.urgent") : t("chantier.urgency.normal")}
                 </button>
               );
             })}
@@ -458,19 +453,19 @@ export default function ChantierDetailPage() {
 
         <div>
           <div className="font-semibold text-gray-700 mb-1 text-sm">
-            Équipe attribuée
+            {t("chantier.field.team")}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => patch("team", { team: null })}
-              disabled={savingField === "team"}
+              disabled={readOnly || savingField === "team"}
               className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
                 !chantier.team
                   ? "bg-gray-700 text-white"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
             >
-              Aucune
+              {t("common.none")}
             </button>
             {CHANTIER_TEAMS.map((t) => {
               const active = chantier.team === t;
@@ -479,7 +474,7 @@ export default function ChantierDetailPage() {
                 <button
                   key={t}
                   onClick={() => patch("team", { team: t })}
-                  disabled={savingField === "team"}
+                  disabled={readOnly || savingField === "team"}
                   className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors border-2 ${
                     active
                       ? "border-accent bg-white text-gray-900"
@@ -496,19 +491,19 @@ export default function ChantierDetailPage() {
 
       {/* ─── Editable workflow fields ────────────────────────────── */}
       <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 space-y-4">
-        <h2 className="text-sm font-bold text-gray-700">Planification</h2>
+        <h2 className="text-sm font-bold text-gray-700">{t("chantier.section.planning")}</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="text-sm">
             <div className="font-semibold text-gray-700 mb-1">
-              Statut
+              {t("chantier.field.status")}
             </div>
             <select
               value={chantier.status}
               onChange={(e) =>
                 patch("status", { status: e.target.value as ChantierStatus })
               }
-              disabled={savingField === "status"}
+              disabled={readOnly || savingField === "status"}
               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none bg-white"
             >
               {STATUSES.map((s) => (
@@ -521,7 +516,7 @@ export default function ChantierDetailPage() {
 
           <label className="text-sm">
             <div className="font-semibold text-gray-700 mb-1">
-              Date d&apos;installation
+              {t("chantier.field.scheduledDate")}
             </div>
             <input
               type="date"
@@ -531,7 +526,7 @@ export default function ChantierDetailPage() {
                   scheduledDate: e.target.value || null,
                 })
               }
-              disabled={savingField === "scheduledDate"}
+              disabled={readOnly || savingField === "scheduledDate"}
               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
             />
           </label>
@@ -553,7 +548,7 @@ export default function ChantierDetailPage() {
 
         <label className="text-sm block">
           <div className="font-semibold text-gray-700 mb-1">
-            Montant total (CAD) — requis pour facture
+            {t("chantier.field.totalAmount")}
           </div>
           <input
             type="number"
@@ -567,13 +562,13 @@ export default function ChantierDetailPage() {
                 totalAmount: v === "" ? null : Number(v),
               });
             }}
-            disabled={savingField === "totalAmount"}
+            disabled={readOnly || savingField === "totalAmount"}
             className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
           />
         </label>
 
         <label className="text-sm block">
-          <div className="font-semibold text-gray-700 mb-1">Notes</div>
+          <div className="font-semibold text-gray-700 mb-1">{t("chantier.field.notes")}</div>
           <textarea
             value={chantier.notes ?? ""}
             rows={3}
@@ -581,9 +576,9 @@ export default function ChantierDetailPage() {
             onChange={(e) =>
               setChantier({ ...chantier, notes: e.target.value })
             }
-            disabled={savingField === "notes"}
+            disabled={readOnly || savingField === "notes"}
             className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none resize-y"
-            placeholder="Contexte interne, demandes spéciales, etc."
+            placeholder={t("chantier.notes.placeholder")}
           />
         </label>
       </div>
@@ -598,7 +593,7 @@ export default function ChantierDetailPage() {
             onClick={handleDelete}
             className="text-sm text-red-600 hover:text-red-700 hover:underline"
           >
-            Supprimer ce chantier
+            {t("chantier.delete")}
           </button>
         </div>
       )}

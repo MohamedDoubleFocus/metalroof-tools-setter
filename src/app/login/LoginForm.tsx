@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { useT } from "@/lib/i18n/context";
+import LanguageToggle from "@/components/shared/LanguageToggle";
 
 export default function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get("redirect") || null;
+  const { t } = useT();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +33,7 @@ export default function LoginForm() {
       });
 
       if (signInError) {
-        setError("Email ou mot de passe incorrect");
+        setError(t("auth.login.error.invalid"));
         setSubmitting(false);
         return;
       }
@@ -38,25 +41,28 @@ export default function LoginForm() {
       const target = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/";
       window.location.href = target;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur de connexion");
+      setError(err instanceof Error ? err.message : t("common.error"));
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 px-4 py-8 relative">
+      <div className="absolute top-4 right-4">
+        <LanguageToggle />
+      </div>
       <div className="w-full max-w-sm bg-white border-2 border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">
-            Metal Roof Montréal
+            {t("auth.login.title")}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Connexion à l&apos;outil interne</p>
+          <p className="text-sm text-gray-500 mt-1">{t("auth.login.subtitle")}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <label className="block">
             <span className="block text-sm font-semibold text-gray-700 mb-1">
-              Courriel
+              {t("auth.login.email")}
             </span>
             <input
               type="email"
@@ -72,7 +78,7 @@ export default function LoginForm() {
 
           <label className="block">
             <span className="block text-sm font-semibold text-gray-700 mb-1">
-              Mot de passe
+              {t("auth.login.password")}
             </span>
             <input
               type="password"
@@ -96,12 +102,12 @@ export default function LoginForm() {
             disabled={submitting || !email || !password}
             className="w-full py-3 bg-accent text-white rounded-xl font-bold text-base hover:bg-accent-light disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            {submitting ? "Connexion..." : "Se connecter"}
+            {submitting ? t("auth.login.submitting") : t("auth.login.submit")}
           </button>
         </form>
 
         <p className="text-xs text-gray-400 text-center mt-6">
-          Mot de passe oublié ? Contacte ton administrateur.
+          {t("auth.login.forgotPassword")}
         </p>
       </div>
     </div>

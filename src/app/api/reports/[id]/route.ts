@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import {
   getReportOrder,
   updateReportOrder,
   deleteReportOrder,
 } from "@/lib/reports/kv";
 import { detectContext } from "@/lib/reports/context";
+import { fireReportUnavailableWebhook } from "@/lib/reports/make-webhook";
 import { redactForFreelancer } from "@/types/reports";
 import type {
   UpdateReportOrderInput,
@@ -18,6 +20,7 @@ const VALID_STATUSES: ReportStatus[] = [
   "in_progress",
   "ready",
   "delivered",
+  "unavailable",
 ];
 
 export async function GET(
@@ -63,14 +66,28 @@ export async function PATCH(
 
   let patch: UpdateReportOrderInput;
   if (ctx === "freelancer") {
-    // Freelancer can only flip status to in_progress
-    if (body.status !== "in_progress") {
+    // Freelancer can flip status to in_progress, or mark as unavailable.
+    // PDF upload still goes through the dedicated /upload-pdf endpoint.
+    if (body.status === "in_progress") {
+      patch = { status: "in_progress" };
+    } else if (body.status === "unavailable") {
+      const reason = (body.unavailableReason ?? "").trim();
+      if (!reason) {
+        return NextResponse.json(
+          { error: "A reason is required to mark the order as unavailable" },
+          { status: 400 }
+        );
+      }
+      patch = { status: "unavailable", unavailableReason: reason };
+    } else {
       return NextResponse.json(
-        { error: "Seul le statut 'in_progress' peut être mis depuis le portail" },
+        {
+          error:
+            "Only 'in_progress' or 'unavailable' statuses can be set from the portal",
+        },
         { status: 403 }
       );
     }
-    patch = { status: "in_progress" };
   } else {
     patch = body as UpdateReportOrderInput;
   }
@@ -78,6 +95,16 @@ export async function PATCH(
   const updated = await updateReportOrder(id, patch);
   if (!updated) {
     return NextResponse.json({ error: "Commande introuvable" }, { status: 404 });
+  }
+
+  // Notify the closer team in the background when freelancer marks it as
+  // unavailable — they need to know they have to handle the order another way.
+  if (
+    ctx === "freelancer" &&
+    patch.status === "unavailable" &&
+    updated.status === "unavailable"
+  ) {
+    after(() => fireReportUnavailableWebhook(updated));
   }
 
   if (ctx === "freelancer") {

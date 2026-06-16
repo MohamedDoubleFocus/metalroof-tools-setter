@@ -34,6 +34,7 @@ interface ReportOrderRow {
   reference_photos: string[];
   status: string;
   pdf_url: string | null;
+  unavailable_reason: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -57,6 +58,7 @@ function rowToReportOrder(row: ReportOrderRow): ReportOrder {
     referencePhotos: row.reference_photos ?? [],
     status: row.status as ReportStatus,
     pdfUrl: strOrUndef(row.pdf_url),
+    unavailableReason: strOrUndef(row.unavailable_reason),
     createdAt: new Date(row.created_at).getTime(),
     updatedAt: new Date(row.updated_at).getTime(),
     completedAt: tsOrUndef(row.completed_at),
@@ -76,6 +78,7 @@ function reportOrderToRow(o: ReportOrder) {
     reference_photos: o.referencePhotos ?? [],
     status: o.status,
     pdf_url: o.pdfUrl ?? null,
+    unavailable_reason: o.unavailableReason ?? null,
     created_at: new Date(o.createdAt).toISOString(),
     updated_at: new Date(o.updatedAt).toISOString(),
     completed_at: isoOrNull(o.completedAt),
@@ -154,6 +157,7 @@ export async function updateReportOrder(
     notes: patch.notes ?? existing.notes,
     closerLabel: patch.closerLabel ?? existing.closerLabel,
     clientPhone: patch.clientPhone ?? existing.clientPhone,
+    unavailableReason: patch.unavailableReason ?? existing.unavailableReason,
     updatedAt: Date.now(),
     completedAt:
       patch.status === "ready" && !existing.completedAt

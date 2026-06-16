@@ -6,7 +6,8 @@ export type ReportStatus =
   | "pending" // closer just created it; freelancer hasn't picked it up
   | "in_progress" // freelancer started working on it
   | "ready" // freelancer uploaded the PDF; awaiting closer pickup
-  | "delivered"; // closer downloaded / marked as done
+  | "delivered" // closer downloaded / marked as done
+  | "unavailable"; // freelancer signaled the report is impossible to produce
 
 export interface ReportOrder {
   id: string; // UUID
@@ -25,6 +26,8 @@ export interface ReportOrder {
   // ─── Workflow state ──────────────────────────────────────────────────
   status: ReportStatus;
   pdfUrl?: string; // Vercel Blob URL uploaded by the freelancer
+  /** Reason given by the freelancer when marking the order as unavailable. */
+  unavailableReason?: string;
   createdAt: number;
   updatedAt: number;
   completedAt?: number; // when status becomes "ready"
@@ -49,6 +52,7 @@ export interface UpdateReportOrderInput {
   notes?: string;
   closerLabel?: string;
   clientPhone?: string;
+  unavailableReason?: string;
 }
 
 /**
@@ -64,6 +68,7 @@ export interface FreelancerOrderView {
   referencePhotos: string[];
   status: ReportStatus;
   pdfUrl?: string;
+  unavailableReason?: string;
   createdAt: number;
   updatedAt: number;
   completedAt?: number;
@@ -80,6 +85,7 @@ export function redactForFreelancer(order: ReportOrder): FreelancerOrderView {
     referencePhotos: order.referencePhotos,
     status: order.status,
     pdfUrl: order.pdfUrl,
+    unavailableReason: order.unavailableReason,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
     completedAt: order.completedAt,

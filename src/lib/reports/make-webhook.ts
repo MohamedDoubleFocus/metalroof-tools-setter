@@ -176,6 +176,68 @@ export async function fireReportCreatedWebhook(
   await post(buildFreelancerCreatedEmail(order));
 }
 
+function buildTeamUnavailableEmail(order: ReportOrder): EmailWebhookPayload {
+  const reason = order.unavailableReason ?? "(no reason given)";
+  const phoneRow = order.clientPhone
+    ? `<tr><td style="padding:8px 0;color:#6b7280;width:120px;">Téléphone</td><td style="padding:8px 0;font-weight:600;">${escapeHtml(order.clientPhone)}</td></tr>`
+    : "";
+
+  const body = `
+<!doctype html>
+<html><body style="font-family:Arial,Helvetica,sans-serif;color:#111827;background:#f9fafb;padding:24px;">
+  <div style="max-width:600px;margin:0 auto;background:white;border:1px solid #e5e7eb;border-radius:12px;padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:20px;color:#b91c1c;">⚠️ Rapport indisponible</h2>
+    <p style="margin:0 0 16px;color:#4b5563;">Le freelancer a signalé que cette commande ne peut pas être réalisée.</p>
+
+    <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:16px 0;">
+      <tr><td style="padding:8px 0;color:#6b7280;width:120px;">Client</td><td style="padding:8px 0;font-weight:600;">${escapeHtml(order.closerLabel)}</td></tr>
+      ${phoneRow}
+      <tr><td style="padding:8px 0;color:#6b7280;width:120px;">Adresse</td><td style="padding:8px 0;font-weight:600;">${escapeHtml(order.address)}</td></tr>
+    </table>
+
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="margin:0 0 4px;font-size:12px;color:#991b1b;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">Raison</p>
+      <p style="margin:0;color:#7f1d1d;white-space:pre-wrap;">${escapeHtml(reason)}</p>
+    </div>
+
+    <p style="margin:32px 0 0;font-size:12px;color:#9ca3af;">
+      Metal Roof Montréal · notification automatique
+    </p>
+  </div>
+</body></html>`.trim();
+
+  const to = process.env.TEAM_EMAIL;
+  return {
+    to: to ?? "",
+    subject: `Rapport indisponible — ${order.closerLabel}`,
+    body,
+  };
+}
+
+/**
+ * Notify the closer team that the freelancer cannot produce this report.
+ * Fired from PATCH /api/reports/[id] when the freelancer flips status
+ * to "unavailable".
+ */
+export async function fireReportUnavailableWebhook(
+  order: ReportOrder
+): Promise<void> {
+  if (order.status !== "unavailable") {
+    console.warn(
+      "[reports-webhook] skipping unavailable email — order not in unavailable state",
+      { id: order.id, status: order.status }
+    );
+    return;
+  }
+  if (!process.env.TEAM_EMAIL) {
+    console.warn(
+      "[reports-webhook] TEAM_EMAIL not set — skipping unavailable email"
+    );
+    return;
+  }
+  await post(buildTeamUnavailableEmail(order));
+}
+
 /**
  * Notify the closer team that the report is ready for pickup.
  * Fired from /api/reports/upload-pdf after the freelancer uploads the PDF.

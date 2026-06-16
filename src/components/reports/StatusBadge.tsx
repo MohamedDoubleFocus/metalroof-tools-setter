@@ -29,6 +29,11 @@ const DEFS: Record<ReportStatus, Def> = {
     emoji: "📦",
     classes: "bg-gray-100 text-gray-700 border-gray-200",
   },
+  unavailable: {
+    label: "Indisponible",
+    emoji: "⚠️",
+    classes: "bg-red-100 text-red-800 border-red-200",
+  },
 };
 
 export function getStatusDef(status: ReportStatus): Def {

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { FreelancerOrderView, ReportStatus } from "@/types/reports";
 
-type GroupKey = "pending" | "in_progress" | "ready";
+type GroupKey = "pending" | "in_progress" | "ready" | "unavailable";
 
 const GROUPS: Array<{ key: GroupKey; label: string; accent: string }> = [
   {
@@ -21,6 +21,11 @@ const GROUPS: Array<{ key: GroupKey; label: string; accent: string }> = [
     key: "ready",
     label: "Done",
     accent: "border-emerald-300 bg-emerald-50",
+  },
+  {
+    key: "unavailable",
+    label: "Unavailable",
+    accent: "border-red-300 bg-red-50",
   },
 ];
 
@@ -82,6 +87,7 @@ export default function PortalHomePage() {
       in_progress: [],
       ready: [],
       delivered: [],
+      unavailable: [],
     };
     for (const o of filtered) out[o.status].push(o);
     // Newest first within each group
@@ -119,7 +125,7 @@ export default function PortalHomePage() {
       {loading ? (
         <div className="text-center py-10 text-slate-400">Loading…</div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {GROUPS.map((group) => {
             const items = byGroup[group.key];
             return (

@@ -154,6 +154,21 @@ export default function ReportDetailPage() {
         )}
       </div>
 
+      {order.status === "unavailable" && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
+          <h3 className="text-sm font-bold text-red-800 uppercase tracking-wider mb-2">
+            ⚠️ Rapport signalé indisponible par le freelancer
+          </h3>
+          {order.unavailableReason ? (
+            <p className="text-sm text-red-900 whitespace-pre-wrap">
+              {order.unavailableReason}
+            </p>
+          ) : (
+            <p className="text-sm text-red-700 italic">Aucune raison fournie.</p>
+          )}
+        </div>
+      )}
+
       {order.notes && (
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">

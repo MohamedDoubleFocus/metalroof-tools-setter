@@ -11,6 +11,7 @@ const STATUS_FILTERS: Array<{ key: ReportStatus | "all"; label: string }> = [
   { key: "in_progress", label: "En cours" },
   { key: "ready", label: "Prêts" },
   { key: "delivered", label: "Livrés" },
+  { key: "unavailable", label: "Indisponibles" },
 ];
 
 export default function ReportsListPage() {
@@ -78,6 +79,7 @@ export default function ReportsListPage() {
       in_progress: 0,
       ready: 0,
       delivered: 0,
+      unavailable: 0,
     };
     for (const o of orders) out[o.status]++;
     return out;

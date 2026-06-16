@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listAllChantiers } from "@/lib/chantiers/kv";
 import { buildProposals, type CsvRow } from "@/lib/chantiers/roofr-match";
+import { requireAdmin, respondError } from "@/lib/auth/can";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,6 +15,11 @@ export const maxDuration = 60;
  * / none). No mutation — purely a preview endpoint.
  */
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   let body: { rows?: CsvRow[] };
   try {
     body = await request.json();

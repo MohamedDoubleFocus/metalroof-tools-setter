@@ -7,6 +7,7 @@ import {
 } from "@/lib/prospection/kv";
 import { fetchStreetsInPolygon } from "@/lib/prospection/overpass";
 import { getKnockerById } from "@/lib/prospection/knockers";
+import { requireSDROrAdmin, respondError } from "@/lib/auth/can";
 import type { CreateSectorInput, LatLng } from "@/types/prospection";
 
 export const runtime = "nodejs";
@@ -17,6 +18,11 @@ export const maxDuration = 60;
  * Returns all sectors (light — without their full street list).
  */
 export async function GET() {
+  try {
+    await requireSDROrAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   try {
     const sectors = await listSectors();
     return NextResponse.json({ sectors });
@@ -42,6 +48,11 @@ export async function GET() {
  *   5. Return the sector + the street count
  */
 export async function POST(request: NextRequest) {
+  try {
+    await requireSDROrAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   let body: Partial<CreateSectorInput>;
   try {
     body = await request.json();

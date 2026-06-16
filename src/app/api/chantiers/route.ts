@@ -8,6 +8,11 @@ import {
 import { normalizePhoneE164 } from "@/lib/codes";
 import { geocodeAddress } from "@/lib/chantiers/geocode";
 import {
+  requireAdmin,
+  requireForemanOrAdmin,
+  respondError,
+} from "@/lib/auth/can";
+import {
   CHANTIER_TEAMS,
   type ChantierTeam,
   type CreateChantierInput,
@@ -22,6 +27,7 @@ const VALID_TEAMS = new Set<ChantierTeam>(CHANTIER_TEAMS);
 
 export async function GET() {
   try {
+    await requireForemanOrAdmin();
     const chantiers = await listAllChantiers();
 
     // Background backfill: any chantier missing lat/lng gets geocoded after
@@ -41,14 +47,16 @@ export async function GET() {
 
     return NextResponse.json({ chantiers });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Erreur" },
-      { status: 500 }
-    );
+    return respondError(err);
   }
 }
 
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   let body: Partial<CreateChantierInput>;
   try {
     body = await request.json();

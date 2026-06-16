@@ -8,6 +8,7 @@ import {
 } from "@/lib/prospection/kv";
 import { getKnockerById } from "@/lib/prospection/knockers";
 import { fireProspectionWebhook } from "@/lib/prospection/make-webhook";
+import { requireSDROrAdmin, respondError } from "@/lib/auth/can";
 import type { CreateLeadInput, LeadStatus } from "@/types/prospection";
 
 export const runtime = "nodejs";
@@ -27,6 +28,11 @@ const VALID_STATUSES: LeadStatus[] = [
  *   ?knockerId=X       (filter by knocker — if absent, all knockers)
  */
 export async function GET(request: NextRequest) {
+  try {
+    await requireSDROrAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   const url = new URL(request.url);
   const range = url.searchParams.get("range");
   const date = url.searchParams.get("date") || todayDateKey();
@@ -72,6 +78,11 @@ export async function GET(request: NextRequest) {
  *   }
  */
 export async function POST(request: NextRequest) {
+  try {
+    await requireSDROrAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   let body: Partial<CreateLeadInput>;
   try {
     body = await request.json();

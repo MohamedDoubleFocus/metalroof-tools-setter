@@ -8,6 +8,11 @@ import {
 } from "@/lib/chantiers/kv";
 import { normalizePhoneE164 } from "@/lib/codes";
 import { geocodeAddress } from "@/lib/chantiers/geocode";
+import {
+  requireAdmin,
+  requireForemanOrAdmin,
+  respondError,
+} from "@/lib/auth/can";
 import type { UpdateChantierInput } from "@/types/chantiers";
 
 export const runtime = "nodejs";
@@ -16,6 +21,11 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
+    await requireForemanOrAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   const { id } = await params;
   const chantier = await getChantier(id);
   if (!chantier) {
@@ -31,6 +41,11 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
+    await requireAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   const { id } = await params;
 
   let body: Partial<UpdateChantierInput>;
@@ -85,6 +100,11 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
+    await requireAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   const { id } = await params;
   const ok = await deleteChantier(id);
   if (!ok) {

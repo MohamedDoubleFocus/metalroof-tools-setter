@@ -1,42 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import {
-  PASS_COOKIE,
-  PORTAL_COOKIE,
-  isCookieValid,
-  isPortalCookieValid,
-} from "@/lib/auth-gate";
+import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
+import { PORTAL_COOKIE, isPortalCookieValid } from "@/lib/auth-gate";
+import { canAccess } from "@/lib/auth/can";
+import { homeForRole, type UserRole } from "@/lib/auth/session";
 
 /**
- * Two-surface passcode gate.
+ * Two-surface routing + Supabase Auth gate.
  *
- * The same deployment serves two completely different audiences depending on
- * which hostname the request hit:
+ * Closer site (default): full Supabase Auth (email+password). Role-based
+ * access via the `profiles` table. Public-only paths bypass auth.
  *
- *  - Closer site (default, e.g. metalroof-tools-setter.vercel.app):
- *      everything visible EXCEPT the freelancer portal (`/portal*`), which
- *      returns 404 here to keep the white-label water-tight.
- *      Requires the closer passcode cookie (PASS_COOKIE).
- *
- *  - Freelancer site (matched against FREELANCER_DOMAIN env var):
- *      ONLY `/portal*`, `/portal-locked`, and the supporting API endpoints
- *      are reachable. Everything else is redirected to `/portal` so the
- *      freelancer can never discover the closer-facing tools.
- *      Requires the portal passcode cookie (PORTAL_COOKIE).
- *
- * Public on BOTH sites (no passcode at all):
- *   - /client/*            (public simulation portal for end-customers)
- *   - /api/client/*        (endpoints powering the client portal)
- *   - /api/webhooks/*      (GHL inbound webhooks — auth via shared secret)
- *   - /api/internal/*      (worker-to-worker calls — auth via X-Internal-Auth)
- *   - /api/upload          (image upload — used by client portal + internal)
- *   - /api/pdf             (PDF download — used by both)
- *
- * Public on the closer site only:
- *   - /api/auth/passcode + /locked  (closer unlock)
- *
- * Public on the freelancer site only:
- *   - /api/auth/portal-passcode + /portal-locked  (freelancer unlock)
+ * Freelancer site (matched by FREELANCER_DOMAIN): kept on the legacy
+ * `rp-pass` HMAC cookie — it's a completely separate white-labeled audience
+ * that doesn't share employee identities with the internal team.
  */
 
 const ALWAYS_PUBLIC_PREFIXES = [
@@ -46,16 +24,21 @@ const ALWAYS_PUBLIC_PREFIXES = [
   "/api/internal/",
   "/api/upload",
   "/api/pdf",
-  // Vercel Blob makes server-to-server callbacks to these endpoints without
-  // any cookie — they have to be reachable on both domains. Auth is enforced
-  // INSIDE the handlers via `detectContext()` + `handleUpload`'s built-in
-  // signature validation for upload-completed callbacks.
+  // Vercel Blob server-to-server callbacks (signed inside handler).
   "/api/reports/upload-pdf",
   "/api/reports/upload-photo",
 ];
 
+const AUTH_PUBLIC_PATHS = ["/login", "/auth/callback", "/logout"];
+
 function startsWithAny(pathname: string, prefixes: string[]): boolean {
   return prefixes.some((p) => pathname === p || pathname.startsWith(p));
+}
+
+function isAuthPublicPath(pathname: string): boolean {
+  return AUTH_PUBLIC_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
 }
 
 function isPortalPath(pathname: string): boolean {
@@ -64,7 +47,7 @@ function isPortalPath(pathname: string): boolean {
     pathname.startsWith("/portal/") ||
     pathname === "/portal-locked" ||
     pathname.startsWith("/api/auth/portal-passcode") ||
-    pathname.startsWith("/api/reports/") || // freelancer needs reports API
+    pathname.startsWith("/api/reports/") ||
     pathname === "/api/reports"
   );
 }
@@ -72,10 +55,27 @@ function isPortalPath(pathname: string): boolean {
 function isFreelancerHost(host: string): boolean {
   const domain = process.env.FREELANCER_DOMAIN;
   if (!domain) return false;
-  // Strip port for comparison
   const cleanHost = host.split(":")[0].toLowerCase();
   const cleanDomain = domain.split(":")[0].toLowerCase();
   return cleanHost === cleanDomain || cleanHost.endsWith("." + cleanDomain);
+}
+
+async function fetchProfileRole(userId: string): Promise<UserRole | null> {
+  try {
+    // Admin client (service_role) — bypasses RLS, single query.
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) return null;
+    const admin = createClient(url, key, { auth: { persistSession: false } });
+    const { data } = await admin
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
+    return (data?.role as UserRole) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function middleware(request: NextRequest) {
@@ -88,9 +88,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ─── Freelancer site routing ───────────────────────────────────────────
+  // ─── Freelancer site routing (rp-pass, unchanged) ──────────────────────
   if (onFreelancerSite) {
-    // Anything outside the portal surface gets pushed to /portal (or /portal-locked)
     if (!isPortalPath(pathname)) {
       const url = request.nextUrl.clone();
       url.pathname = "/portal";
@@ -98,7 +97,6 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Unlock endpoint + locked page are open
     if (
       pathname === "/portal-locked" ||
       pathname.startsWith("/api/auth/portal-passcode")
@@ -106,13 +104,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // Everything else requires the portal cookie
     const portalCookie = request.cookies.get(PORTAL_COOKIE)?.value;
     if (await isPortalCookieValid(portalCookie)) {
       return NextResponse.next();
     }
 
-    // Redirect to /portal-locked preserving the original destination
     const url = request.nextUrl.clone();
     url.pathname = "/portal-locked";
     url.search = "";
@@ -122,7 +118,7 @@ export async function middleware(request: NextRequest) {
 
   // ─── Closer site routing ───────────────────────────────────────────────
 
-  // Portal routes are 404 on the closer site (water-tight white-label)
+  // Portal routes are 404 on the closer site (white-label water-tight)
   if (
     pathname === "/portal" ||
     pathname.startsWith("/portal/") ||
@@ -132,25 +128,77 @@ export async function middleware(request: NextRequest) {
     return new NextResponse(null, { status: 404 });
   }
 
-  // Closer auth surface is open
-  if (
-    pathname === "/locked" ||
-    pathname.startsWith("/api/auth/passcode")
-  ) {
+  // Auth pages (login, callback, logout) are open without session
+  if (isAuthPublicPath(pathname)) {
     return NextResponse.next();
   }
 
-  // Everything else on the closer site requires the closer cookie
-  const closerCookie = request.cookies.get(PASS_COOKIE)?.value;
-  if (await isCookieValid(closerCookie)) {
-    return NextResponse.next();
+  // ─── Supabase session check ────────────────────────────────────────────
+  // Prepare the response we'll mutate (refreshed cookies) before returning.
+  let response = NextResponse.next({ request });
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    // Auth not configured — let request through (e.g. local dev without env).
+    // The downstream API guards will still block writes.
+    return response;
   }
 
-  const url = request.nextUrl.clone();
-  url.pathname = "/locked";
-  url.search = "";
-  url.searchParams.set("next", pathname + request.nextUrl.search);
-  return NextResponse.redirect(url);
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          request.cookies.set(name, value);
+          response.cookies.set(name, value, options);
+        });
+      },
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    url.searchParams.set("redirect", pathname + request.nextUrl.search);
+    return NextResponse.redirect(url);
+  }
+
+  // ─── Role-based access check ───────────────────────────────────────────
+  const role = await fetchProfileRole(user.id);
+  if (!role) {
+    // User exists in auth but has no profile row → block
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("error", "no-profile");
+    return NextResponse.redirect(url);
+  }
+
+  // Home page: non-admin gets bounced to their role-specific home
+  if (pathname === "/" && role !== "admin") {
+    const url = request.nextUrl.clone();
+    url.pathname = homeForRole(role);
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  if (!canAccess(role, pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = homeForRole(role);
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  return response;
 }
 
 export const config = {

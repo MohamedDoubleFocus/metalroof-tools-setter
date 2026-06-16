@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getChantier, setChantierFields } from "@/lib/chantiers/kv";
 import { sendWarrantyCertificate } from "@/lib/sav/send-warranty";
+import { requireAdmin, respondError } from "@/lib/auth/can";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,6 +18,11 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
+    await requireAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   const { id } = await params;
   const chantier = await getChantier(id);
   if (!chantier) {

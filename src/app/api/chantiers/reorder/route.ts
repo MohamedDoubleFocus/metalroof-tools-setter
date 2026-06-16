@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { reorderChantiers } from "@/lib/chantiers/kv";
+import { requireAdmin, respondError } from "@/lib/auth/can";
 
 export const runtime = "nodejs";
 
@@ -14,6 +15,11 @@ export const runtime = "nodejs";
  * Body: { ids: string[] }
  */
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   let body: { ids?: string[] };
   try {
     body = await request.json();

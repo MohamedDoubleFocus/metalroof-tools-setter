@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLead, updateLead, deleteLead } from "@/lib/prospection/kv";
+import { requireSDROrAdmin, respondError } from "@/lib/auth/can";
 import type { UpdateLeadInput, LeadStatus } from "@/types/prospection";
 
 export const runtime = "nodejs";
+
+async function gate() {
+  try {
+    await requireSDROrAdmin();
+    return null;
+  } catch (err) {
+    return respondError(err);
+  }
+}
 
 const VALID_STATUSES: LeadStatus[] = [
   "absent",
@@ -16,6 +26,8 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const guard = await gate();
+  if (guard) return guard;
   const { id } = await params;
   const lead = await getLead(id);
   if (!lead) {
@@ -28,6 +40,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const guard = await gate();
+  if (guard) return guard;
   const { id } = await params;
 
   let body: Partial<UpdateLeadInput>;
@@ -52,6 +66,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const guard = await gate();
+  if (guard) return guard;
   const { id } = await params;
   const ok = await deleteLead(id);
   if (!ok) {

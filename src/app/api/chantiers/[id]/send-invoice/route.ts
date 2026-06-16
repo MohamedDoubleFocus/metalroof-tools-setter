@@ -4,6 +4,7 @@ import { buildInvoicePdf, formatInvoiceNumber } from "@/lib/chantiers/invoice-pd
 import { uploadInvoicePdf } from "@/lib/chantiers/invoice-blob";
 import { fireInvoiceWebhook } from "@/lib/chantiers/make-webhook";
 import { getLogoPngBuffer } from "@/lib/image-utils";
+import { requireAdmin, respondError } from "@/lib/auth/can";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,6 +20,11 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
+    await requireAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   const { id } = await params;
   const chantier = await getChantier(id);
   if (!chantier) {

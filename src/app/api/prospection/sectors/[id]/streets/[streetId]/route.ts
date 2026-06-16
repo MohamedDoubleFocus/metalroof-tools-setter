@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { toggleStreetDone } from "@/lib/prospection/kv";
 import { getKnockerById } from "@/lib/prospection/knockers";
+import { requireSDROrAdmin, respondError } from "@/lib/auth/can";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,11 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; streetId: string }> }
 ) {
+  try {
+    await requireSDROrAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   const { streetId } = await params;
 
   let body: { knockerId?: string; done?: boolean };

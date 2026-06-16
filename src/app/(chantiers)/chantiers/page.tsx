@@ -10,12 +10,29 @@ import ChantierFilters, {
 } from "@/components/chantiers/ChantierFilters";
 import ChantierKanban from "@/components/chantiers/ChantierKanban";
 import type { Chantier } from "@/types/chantiers";
+import { useMyProfile } from "@/lib/auth/use-me";
 
 export default function ChantiersKanbanPage() {
+  const profile = useMyProfile();
+  const isAdmin = profile?.role === "admin";
+  const isForeman = profile?.role === "foreman";
+
   const [chantiers, setChantiers] = useState<Chantier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<FiltersState>(() => ({
+    ...EMPTY_FILTERS,
+    // Foreman default-filter to their assigned team
+    team: "all",
+  }));
+
+  // Once the profile loads, if foreman has a team assigned, default the filter
+  useEffect(() => {
+    if (isForeman && profile?.team && filters.team === "all") {
+      setFilters((f) => ({ ...f, team: profile.team as FiltersState["team"] }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isForeman, profile?.team]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,32 +73,34 @@ export default function ChantiersKanbanPage() {
             la priorité.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          <Link
-            href="/chantiers/teams"
-            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-xs sm:text-sm hover:border-accent hover:text-accent"
-          >
-            👥 Équipes
-          </Link>
-          <Link
-            href="/chantiers/import-roofr"
-            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-xs sm:text-sm hover:border-accent hover:text-accent"
-          >
-            🏠 Import Roofr
-          </Link>
-          <Link
-            href="/chantiers/import"
-            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-xs sm:text-sm hover:border-accent hover:text-accent"
-          >
-            Import
-          </Link>
-          <Link
-            href="/chantiers/new"
-            className="px-3 sm:px-5 py-2 sm:py-2.5 bg-accent text-white rounded-xl font-bold text-xs sm:text-sm hover:bg-accent-light shadow-sm whitespace-nowrap"
-          >
-            + Nouveau
-          </Link>
-        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <Link
+              href="/chantiers/teams"
+              className="px-3 sm:px-4 py-2 sm:py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-xs sm:text-sm hover:border-accent hover:text-accent"
+            >
+              👥 Équipes
+            </Link>
+            <Link
+              href="/chantiers/import-roofr"
+              className="px-3 sm:px-4 py-2 sm:py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-xs sm:text-sm hover:border-accent hover:text-accent"
+            >
+              🏠 Import Roofr
+            </Link>
+            <Link
+              href="/chantiers/import"
+              className="px-3 sm:px-4 py-2 sm:py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-xs sm:text-sm hover:border-accent hover:text-accent"
+            >
+              Import
+            </Link>
+            <Link
+              href="/chantiers/new"
+              className="px-3 sm:px-5 py-2 sm:py-2.5 bg-accent text-white rounded-xl font-bold text-xs sm:text-sm hover:bg-accent-light shadow-sm whitespace-nowrap"
+            >
+              + Nouveau
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -111,6 +130,8 @@ export default function ChantiersKanbanPage() {
           chantiers={chantiers}
           filters={filters}
           onChange={setChantiers}
+          readOnly={isForeman}
+          hideSubmission={isForeman}
         />
       )}
     </div>

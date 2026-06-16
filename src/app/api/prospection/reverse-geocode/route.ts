@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireSDROrAdmin, respondError } from "@/lib/auth/can";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,11 @@ export const runtime = "nodejs";
  * pre-filled. They just need to type the civic number.
  */
 export async function POST(request: NextRequest) {
+  try {
+    await requireSDROrAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   let body: { lat?: number; lng?: number };
   try {
     body = await request.json();

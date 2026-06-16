@@ -117,14 +117,19 @@ interface Props {
   chantiers: Chantier[];
   filters: FiltersState;
   onChange: (updated: Chantier[]) => void;
+  /** When true, drag-and-drop is disabled — cards just clickable. */
+  readOnly?: boolean;
+  /** When true, the submission link badge is hidden on cards. */
+  hideSubmission?: boolean;
 }
 
 interface DroppableColumnProps {
   column: Column;
   items: Chantier[];
+  hideSubmission?: boolean;
 }
 
-function DroppableColumn({ column, items }: DroppableColumnProps) {
+function DroppableColumn({ column, items, hideSubmission }: DroppableColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: column.key });
   return (
     <div
@@ -151,7 +156,11 @@ function DroppableColumn({ column, items }: DroppableColumnProps) {
             </p>
           ) : (
             items.map((c) => (
-              <ChantierKanbanCard key={c.id} chantier={c} />
+              <ChantierKanbanCard
+                key={c.id}
+                chantier={c}
+                hideSubmission={hideSubmission}
+              />
             ))
           )}
         </div>
@@ -160,7 +169,13 @@ function DroppableColumn({ column, items }: DroppableColumnProps) {
   );
 }
 
-export default function ChantierKanban({ chantiers, filters, onChange }: Props) {
+export default function ChantierKanban({
+  chantiers,
+  filters,
+  onChange,
+  readOnly = false,
+  hideSubmission = false,
+}: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -197,6 +212,7 @@ export default function ChantierKanban({ chantiers, filters, onChange }: Props) 
 
   const handleDragEnd = async (e: DragEndEvent) => {
     setActiveId(null);
+    if (readOnly) return; // foreman: drag is a no-op
     const { active, over } = e;
     if (!over) return;
 
@@ -300,7 +316,11 @@ export default function ChantierKanban({ chantiers, filters, onChange }: Props) 
       <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-3 px-3 sm:mx-0 sm:px-0 snap-x snap-mandatory sm:snap-none">
         {COLUMNS.map((col) => (
           <div key={col.key} className="snap-start sm:snap-none">
-            <DroppableColumn column={col} items={byColumn[col.key]} />
+            <DroppableColumn
+              column={col}
+              items={byColumn[col.key]}
+              hideSubmission={hideSubmission}
+            />
           </div>
         ))}
       </div>

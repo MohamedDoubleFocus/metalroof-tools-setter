@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateChantier } from "@/lib/chantiers/kv";
+import { requireAdmin, respondError } from "@/lib/auth/can";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,6 +19,11 @@ interface AttachItem {
  * silently if the chantier no longer exists (returns ok: false for that row).
  */
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   let body: { items?: AttachItem[] };
   try {
     body = await request.json();

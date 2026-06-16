@@ -10,6 +10,7 @@ import {
   type ChantierUrgency,
   type CreateChantierInput,
 } from "@/types/chantiers";
+import { requireAdmin, respondError } from "@/lib/auth/can";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -54,6 +55,11 @@ interface BulkResult {
  * doesn't kill the rest. Closer cookie required (middleware).
  */
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   let body: { items?: BulkItem[] };
   try {
     body = await request.json();

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTeam, updateTeam } from "@/lib/teams/kv";
 import { CHANTIER_TEAMS, type ChantierTeam } from "@/types/chantiers";
 import type { UpdateTeamInput } from "@/types/teams";
+import { requireAdmin, requireAuth, respondError } from "@/lib/auth/can";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,11 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ key: string }> }
 ) {
+  try {
+    await requireAuth();
+  } catch (err) {
+    return respondError(err);
+  }
   const { key } = await params;
   if (!isValidKey(key)) {
     return NextResponse.json({ error: "Équipe inconnue" }, { status: 404 });
@@ -27,6 +33,11 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ key: string }> }
 ) {
+  try {
+    await requireAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   const { key } = await params;
   if (!isValidKey(key)) {
     return NextResponse.json({ error: "Équipe inconnue" }, { status: 404 });

@@ -8,7 +8,9 @@ import ChantierActions from "@/components/chantiers/ChantierActions";
 import ChantierTimeline from "@/components/chantiers/ChantierTimeline";
 import UrgencyBadge from "@/components/chantiers/UrgencyBadge";
 import TeamBadge from "@/components/chantiers/TeamBadge";
+import ChantierPhotos from "@/components/chantiers/ChantierPhotos";
 import { useTeamChiefNames } from "@/lib/teams/use-teams";
+import { useMyProfile } from "@/lib/auth/use-me";
 import { COLORS, COLOR_KEYS } from "@/lib/colors";
 import {
   CHANTIER_TEAMS,
@@ -42,6 +44,11 @@ export default function ChantierDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [savingField, setSavingField] = useState<string | null>(null);
   const chiefNames = useTeamChiefNames();
+  const profile = useMyProfile();
+  const isAdmin = profile?.role === "admin";
+  const isForeman = profile?.role === "foreman";
+  const readOnly = isForeman; // foreman can't edit anything except photos
+  const hideSubmission = isForeman;
 
   useEffect(() => {
     if (!id) return;
@@ -69,6 +76,7 @@ export default function ChantierDetailPage() {
     field: string,
     body: Record<string, unknown>
   ): Promise<void> => {
+    if (readOnly) return; // foreman: no writes
     setSavingField(field);
     try {
       const res = await fetch(`/api/chantiers/${id}`, {
@@ -180,7 +188,11 @@ export default function ChantierDetailPage() {
         </div>
       </div>
 
-      {/* ─── Actions ─────────────────────────────────────────────── */}
+      {/* ─── Photos (always visible — foreman can upload) ──────── */}
+      <ChantierPhotos chantierId={chantier.id} canEdit={isAdmin || isForeman} />
+
+      {/* ─── Actions (admin only) ───────────────────────────────── */}
+      {isAdmin && (
       <div className="bg-white border-2 border-gray-200 rounded-2xl p-5">
         <h2 className="text-sm font-bold text-gray-700 mb-3">Actions</h2>
         <ChantierActions chantier={chantier} onChange={setChantier} />
@@ -195,6 +207,7 @@ export default function ChantierDetailPage() {
           </a>
         )}
       </div>
+      )}
 
       {/* ─── Editable client info ────────────────────────────────── */}
       <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 space-y-4">
@@ -302,7 +315,8 @@ export default function ChantierDetailPage() {
       <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 space-y-4">
         <h2 className="text-sm font-bold text-gray-700">Détails projet</h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className={hideSubmission ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
+          {!hideSubmission && (
           <label className="text-sm block">
             <div className="font-semibold text-gray-700 mb-1">
               Lien vers la soumission
@@ -319,7 +333,7 @@ export default function ChantierDetailPage() {
                   submissionUrl: e.target.value || null,
                 })
               }
-              disabled={savingField === "submissionUrl"}
+              disabled={readOnly || savingField === "submissionUrl"}
               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-accent focus:outline-none"
             />
             {chantier.submissionUrl && (
@@ -333,6 +347,7 @@ export default function ChantierDetailPage() {
               </a>
             )}
           </label>
+          )}
 
           <label className="text-sm block">
             <div className="font-semibold text-gray-700 mb-1">Lien Roofr</div>
@@ -577,15 +592,17 @@ export default function ChantierDetailPage() {
       {/* ─── Timeline ────────────────────────────────────────────── */}
       <ChantierTimeline chantier={chantier} />
 
-      {/* ─── Danger zone ────────────────────────────────────────── */}
-      <div className="pt-4 border-t border-gray-200">
-        <button
-          onClick={handleDelete}
-          className="text-sm text-red-600 hover:text-red-700 hover:underline"
-        >
-          Supprimer ce chantier
-        </button>
-      </div>
+      {/* ─── Danger zone (admin only) ───────────────────────────── */}
+      {isAdmin && (
+        <div className="pt-4 border-t border-gray-200">
+          <button
+            onClick={handleDelete}
+            className="text-sm text-red-600 hover:text-red-700 hover:underline"
+          >
+            Supprimer ce chantier
+          </button>
+        </div>
+      )}
     </div>
   );
 }

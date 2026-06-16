@@ -5,9 +5,19 @@ import {
   deleteSector,
   updateSector,
 } from "@/lib/prospection/kv";
+import { requireSDROrAdmin, respondError } from "@/lib/auth/can";
 import type { UpdateSectorInput } from "@/types/prospection";
 
 export const runtime = "nodejs";
+
+async function gate() {
+  try {
+    await requireSDROrAdmin();
+    return null;
+  } catch (err) {
+    return respondError(err);
+  }
+}
 
 /**
  * GET /api/prospection/sectors/[id]
@@ -17,6 +27,8 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const guard = await gate();
+  if (guard) return guard;
   const { id } = await params;
   const sector = await getSector(id);
   if (!sector) {
@@ -37,6 +49,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const guard = await gate();
+  if (guard) return guard;
   const { id } = await params;
 
   let body: Partial<UpdateSectorInput>;
@@ -63,6 +77,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const guard = await gate();
+  if (guard) return guard;
   const { id } = await params;
   const ok = await deleteSector(id);
   if (!ok) {

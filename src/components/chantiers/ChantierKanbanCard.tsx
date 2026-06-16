@@ -41,9 +41,15 @@ const STYLE_LABELS: Record<NonNullable<Chantier["style"]>, string> = {
 interface Props {
   chantier: Chantier;
   isDragOverlay?: boolean;
+  /** When true, the submission badge is not displayed. */
+  hideSubmission?: boolean;
 }
 
-export default function ChantierKanbanCard({ chantier, isDragOverlay }: Props) {
+export default function ChantierKanbanCard({
+  chantier,
+  isDragOverlay,
+  hideSubmission = false,
+}: Props) {
   const {
     attributes,
     listeners,
@@ -164,7 +170,7 @@ export default function ChantierKanbanCard({ chantier, isDragOverlay }: Props) {
           Ouvrir →
         </Link>
         <div className="flex items-center gap-2">
-          {chantier.submissionUrl && (
+          {!hideSubmission && chantier.submissionUrl && (
             <a
               href={chantier.submissionUrl}
               target="_blank"

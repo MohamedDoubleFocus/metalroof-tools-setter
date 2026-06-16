@@ -6,6 +6,7 @@ import {
   todayDateKey,
 } from "@/lib/prospection/kv";
 import { getKnockerById } from "@/lib/prospection/knockers";
+import { requireSDROrAdmin, respondError } from "@/lib/auth/can";
 import type { CreateAssignmentInput } from "@/types/prospection";
 
 export const runtime = "nodejs";
@@ -16,6 +17,11 @@ export const runtime = "nodejs";
  *   ?sectorId=X            (alternative) — list assignment history for a sector
  */
 export async function GET(request: NextRequest) {
+  try {
+    await requireSDROrAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   const url = new URL(request.url);
   const sectorId = url.searchParams.get("sectorId");
   const date = url.searchParams.get("date") || todayDateKey();
@@ -38,6 +44,11 @@ export async function GET(request: NextRequest) {
  *   Body: { sectorId, knockerId, date, createdBy }
  */
 export async function POST(request: NextRequest) {
+  try {
+    await requireSDROrAdmin();
+  } catch (err) {
+    return respondError(err);
+  }
   let body: Partial<CreateAssignmentInput>;
   try {
     body = await request.json();

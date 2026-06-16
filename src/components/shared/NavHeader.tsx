@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMyProfile } from "@/lib/auth/use-me";
+import { useProfileState } from "@/lib/auth/use-me";
 import { useT } from "@/lib/i18n/context";
 import LanguageToggle from "./LanguageToggle";
 
 export default function NavHeader() {
   const pathname = usePathname();
-  const profile = useMyProfile();
+  const { profile, loaded } = useProfileState();
   const { t } = useT();
 
   const NAV_ITEMS = [
@@ -29,6 +29,10 @@ export default function NavHeader() {
   ) {
     return null;
   }
+
+  // SECURITY: hide the global nav until we know the user's role. Defaulting
+  // to "visible while loading" leaks admin nav to foreman/SDR for a flash.
+  if (!loaded) return null;
 
   // Hide the global nav for foreman + SDR — they have their own focused UI
   // (foreman: chantiers only; SDR: prospection only). Showing them the global

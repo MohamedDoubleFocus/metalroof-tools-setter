@@ -10,12 +10,15 @@ import ChantierFilters, {
 } from "@/components/chantiers/ChantierFilters";
 import ChantierKanban from "@/components/chantiers/ChantierKanban";
 import type { Chantier } from "@/types/chantiers";
-import { useMyProfile } from "@/lib/auth/use-me";
+import { useProfileState } from "@/lib/auth/use-me";
 
 export default function ChantiersKanbanPage() {
-  const profile = useMyProfile();
-  const isAdmin = profile?.role === "admin";
-  const isForeman = profile?.role === "foreman";
+  const { profile, loaded } = useProfileState();
+  const isAdmin = loaded && profile?.role === "admin";
+  // Default to read-only/foreman mode until role is confirmed. Better to
+  // disable drag for a flash than to let foreman accidentally drag a card.
+  const restricted = !loaded || profile?.role === "foreman";
+  const isForeman = loaded && profile?.role === "foreman";
 
   const [chantiers, setChantiers] = useState<Chantier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,8 +133,8 @@ export default function ChantiersKanbanPage() {
           chantiers={chantiers}
           filters={filters}
           onChange={setChantiers}
-          readOnly={isForeman}
-          hideSubmission={isForeman}
+          readOnly={restricted}
+          hideSubmission={restricted}
         />
       )}
     </div>

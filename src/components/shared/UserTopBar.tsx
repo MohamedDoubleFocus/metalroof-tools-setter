@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMyProfile } from "@/lib/auth/use-me";
+import { useProfileState } from "@/lib/auth/use-me";
 import LanguageToggle from "./LanguageToggle";
 import { useT } from "@/lib/i18n/context";
 
@@ -10,9 +10,10 @@ import { useT } from "@/lib/i18n/context";
  * Provides: branding, language toggle, logout. Mobile-first.
  */
 export default function UserTopBar() {
-  const profile = useMyProfile();
+  const { profile, loaded } = useProfileState();
   const { t } = useT();
 
+  if (!loaded) return null;
   if (!profile) return null;
   if (profile.role === "admin") return null;
 

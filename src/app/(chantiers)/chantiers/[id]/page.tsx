@@ -10,7 +10,7 @@ import UrgencyBadge from "@/components/chantiers/UrgencyBadge";
 import TeamBadge from "@/components/chantiers/TeamBadge";
 import ChantierPhotos from "@/components/chantiers/ChantierPhotos";
 import { useTeamChiefNames } from "@/lib/teams/use-teams";
-import { useMyProfile } from "@/lib/auth/use-me";
+import { useProfileState } from "@/lib/auth/use-me";
 import { useT } from "@/lib/i18n/context";
 import { COLORS, COLOR_KEYS } from "@/lib/colors";
 import {
@@ -43,11 +43,13 @@ export default function ChantierDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [savingField, setSavingField] = useState<string | null>(null);
   const chiefNames = useTeamChiefNames();
-  const profile = useMyProfile();
-  const isAdmin = profile?.role === "admin";
-  const isForeman = profile?.role === "foreman";
-  const readOnly = isForeman; // foreman can't edit anything except photos
-  const hideSubmission = isForeman;
+  const { profile, loaded } = useProfileState();
+  const isAdmin = loaded && profile?.role === "admin";
+  const isForeman = loaded && profile?.role === "foreman";
+  // Default to restricted (foreman) mode until role confirmed — prevents
+  // admin-only fields like submissionUrl from flashing for foreman.
+  const readOnly = !loaded || isForeman;
+  const hideSubmission = !loaded || isForeman;
 
   useEffect(() => {
     if (!id) return;

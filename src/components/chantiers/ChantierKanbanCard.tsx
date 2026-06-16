@@ -42,13 +42,17 @@ interface Props {
   isDragOverlay?: boolean;
   /** When true, the submission badge is not displayed. */
   hideSubmission?: boolean;
+  /** When true, the card renders as a plain link with no drag behaviour. */
+  readOnly?: boolean;
 }
 
 export default function ChantierKanbanCard({
   chantier,
   isDragOverlay,
   hideSubmission = false,
+  readOnly = false,
 }: Props) {
+  const sortable = useSortable({ id: chantier.id, disabled: readOnly });
   const {
     attributes,
     listeners,
@@ -56,12 +60,14 @@ export default function ChantierKanbanCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: chantier.id });
+  } = sortable;
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const style = readOnly
+    ? undefined
+    : {
+        transform: CSS.Transform.toString(transform),
+        transition,
+      };
 
   const color = chantier.colorKey ? COLORS[chantier.colorKey] : undefined;
   const amount = formatAmount(chantier.totalAmount);
@@ -71,12 +77,13 @@ export default function ChantierKanbanCard({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={readOnly ? undefined : setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
+      {...(readOnly ? {} : attributes)}
+      {...(readOnly ? {} : listeners)}
       className={`
-        group border-2 rounded-xl p-3 cursor-grab active:cursor-grabbing
+        group border-2 rounded-xl p-3
+        ${readOnly ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}
         ${
           isUrgent
             ? "bg-red-50 border-red-300 hover:border-red-500"
@@ -84,7 +91,7 @@ export default function ChantierKanbanCard({
               ? "bg-white border-amber-300 hover:border-accent"
               : "bg-white border-gray-200 hover:border-accent"
         }
-        ${isDragging ? "opacity-30" : ""}
+        ${!readOnly && isDragging ? "opacity-30" : ""}
         ${isDragOverlay ? "shadow-2xl rotate-2 cursor-grabbing" : "hover:shadow-sm"}
         transition-all
       `}

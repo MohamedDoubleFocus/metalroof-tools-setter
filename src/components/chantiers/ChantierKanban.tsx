@@ -127,9 +127,10 @@ interface DroppableColumnProps {
   column: Column;
   items: Chantier[];
   hideSubmission?: boolean;
+  readOnly?: boolean;
 }
 
-function DroppableColumn({ column, items, hideSubmission }: DroppableColumnProps) {
+function DroppableColumn({ column, items, hideSubmission, readOnly }: DroppableColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: column.key });
   return (
     <div
@@ -160,6 +161,7 @@ function DroppableColumn({ column, items, hideSubmission }: DroppableColumnProps
                 key={c.id}
                 chantier={c}
                 hideSubmission={hideSubmission}
+                readOnly={readOnly}
               />
             ))
           )}
@@ -320,6 +322,7 @@ export default function ChantierKanban({
               column={col}
               items={byColumn[col.key]}
               hideSubmission={hideSubmission}
+              readOnly={readOnly}
             />
           </div>
         ))}

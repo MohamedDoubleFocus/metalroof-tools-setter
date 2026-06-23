@@ -17,7 +17,9 @@ export interface Knocker {
 export const KNOCKERS: Knocker[] = [
   { id: "mohamed", name: "Mohamed" },
   { id: "knocker2", name: "Akram" },
-  { id: "knocker3", name: "Knocker 3" },
+  { id: "knocker3", name: "Billal" },
+  { id: "knocker4", name: "Abderrahmane" }
+
 ];
 
 export function getKnockerById(id: string): Knocker | undefined {
